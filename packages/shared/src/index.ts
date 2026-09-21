@@ -30,9 +30,14 @@ export const PHONE_NUMBER_REGEX = /^0\d{8,9}$/;
 export const ISRAEL_TIME_ZONE = "Asia/Jerusalem";
 
 export const PASSWORD_RESET_CODE_TTL_MINUTES = 10;
+
+/** SMS login (docs/SMS-LOGIN.md): how long a one-time login code lives and how many wrong guesses burn it. */
+export const LOGIN_CODE_TTL_MINUTES = 10;
+export const LOGIN_CODE_MAX_ATTEMPTS = 5;
 export const APPOINTMENT_REMINDER_LEAD_MINUTES = 120;
 
 export * from "./sms";
+export * from "./sms019";
 
 /**
  * Prisma's `@db.Date` columns store a bare calendar date with no time zone.

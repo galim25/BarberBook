@@ -1,0 +1,92 @@
+# כניסת לקוחות עם קוד SMS (בלי סיסמה ובלי הרשמה)
+
+**סטטוס נכון ל-2026-09-22 (לילה): הקוד כתוב, נפרס בשרת הפיתוח, אך המצב החדש כבוי (`CUSTOMER_LOGIN_MODE` לא מוגדר). לא נשלח אף SMS אמיתי מעולם. נשאר: לפתוח חשבון ספק SMS, לבדוק במצב `mock` בדפדפן, ואז להדליק.**
+
+מסמך זה הוא נקודת ההמשך. אם קוראים אותו מחר בבוקר — קפצו ישר ל"מה נשאר לעשות" ול"תרחיש הדלקה".
+
+---
+
+## 1. מה ביקשה המשתמשת ולמה זה נעשה כך
+
+בקשה: לבטל רישום לקוחות; כל מי שמקבל קישור לאפליקציה נכנס עם מספר הטלפון שלו (אם לא חסום) וקובע תור, בלי סיסמה ובלי איפוס סיסמה.
+
+ניתוח הסיכון (נמסר למשתמשת בשיחה): כניסה עם מספר טלפון **בלבד** = כל מי שמכיר/מנחש מספר נכנס בשם הלקוח (רואה תורים כולל שמות ילדים, מבטל, קובע בשמו, ואפילו נרשם להתראות Push של הלקוח במכשיר שלו). ובנוסף מספר הטלפון של המנהל ידוע/פשוט (`0500000000` בשרת הפיתוח) — לכן **המנהל חייב להישאר עם סיסמה בכל מצב**. הפתרון שנבחר (החלטת המשתמשת): **קוד SMS חד-פעמי** — אין סיסמה ואין איפוס, ועדיין יש אימות בעלות על המספר.
+
+## 2. איך זה עובד (מה נבנה)
+
+מצב כניסה נשלט ב-`CUSTOMER_LOGIN_MODE` (`apps/web/src/lib/loginMode.ts`):
+
+| מצב | מתי | מה הלקוח רואה |
+|---|---|---|
+| `password` (ברירת מחדל, **המצב הנוכחי**) | משתנה לא מוגדר / לא `sms_code` / אין ספק SMS תקף | הכניסה והרישום הישנים (טלפון + סיסמה) — שום שינוי |
+| `sms_code` | `CUSTOMER_LOGIN_MODE="sms_code"` **וגם** `SMS_PROVIDER` הוא `019` או `mock` | טלפון → קוד בן 6 ספרות ב-SMS → (מספר חדש בלבד) שם מלא → כניסה |
+
+הדלקת הדגל בלי ספק תקף **לא** מפעילה את המצב (הגנה מפני נעילת כל הלקוחות בחוץ) — נבדק בטסט.
+
+### זרימת הלקוח (מצב `sms_code`)
+1. `/login`: מזינים טלפון → `sendCode`: מגבלות קצב, בדיקת חסימה, יצירת קוד (נשמר רק HMAC שלו בטבלה `login_codes`), שליחה ב-SMS.
+2. מזינים את הקוד → `verifyCode`: בדיקה חד-פעמית (תוקף 10 דקות, 5 ניחושים שגויים שורפים את הקוד). מספר קיים ← נכנס ל-`/account`. מספר חדש ← עובר לשלב שם עם **הוכחה חתומה** (JWT ל-10 דקות) כדי שהעובדה "המספר הזה הוא/לא לקוח" לא נחשפת לפני שהוכח שהמספר שלו.
+3. `signup`: שם מלא → נוצר `User` (סיסמה אקראית לא-שמישה, כמו לקוחות ה-IVR) + הספר מקבל התראת "לקוח חדש" → כניסה.
+
+הכל בפעולת שרת אחת: `apps/web/src/lib/actions/smsLogin.ts` (`smsLoginAction`, שלבים `send`/`verify`/`signup`). הלוגיקה של הקודים ב-`apps/web/src/lib/smsLoginCore.ts` (לא "use server" בכוונה). ה-UI: `app/(auth)/login/SmsLoginForm.tsx`.
+
+### המנהל
+- נכנס **רק** עם סיסמה ב-**`/login/admin`** (קיים תמיד, בשני המצבים). `/admin` ללא סשן מפנה עכשיו ל-`/login/admin`.
+- במצב `sms_code`, `loginAction` (סיסמה) מקבלת רק `administrator`.
+- למספר של מנהל, שלב ה"שליחה" מדמה הצלחה בלי לשלוח ובלי ליצור קוד — אי אפשר לתקוף/לסרוק את חשבון המנהל דרך המסלול הזה.
+
+### מה נסגר במצב `sms_code`
+`/register`, `/forgot-password`, `/reset-password` מפנים ל-`/login` (ב-`proxy.ts`), ו-`registerAction`/`forgotPasswordAction`/`resetPasswordAction` מסרבות גם אם קוראים להן ישירות (הרשמה בסיסמה = לקחת מספר שלא שלך; forgot-password = ערוץ ל-SMS-pumping).
+
+### הגנות
+- מגבלות קצב (זיכרון-תהליך, `rateLimit.ts`): שליחת קוד — 3 ל-15 דק' למספר, 10 לשעה ל-IP, **100 לשעה גלובלית** (תקרת עלות מול SMS-pumping); אימות — 10 ל-15 דק' למספר.
+- קוד: 6 ספרות, `randomInt`, HMAC-SHA256 עם `SESSION_SECRET` (לא נשמר בגלוי, נבדק בטסט), חד-פעמי, קוד חדש מבטל ישנים.
+- חסימות (`BlockedPhoneNumber`) נאכפות בשליחה ובאימות — גם למספרים קיימים.
+- לא נרשמים בלוג מספר הטלפון או תוכן ההודעה (יש בה קוד).
+- ה-worker מוחק קודים שפג תוקפם מעל יממה (cron יומי 03:17, `apps/worker/src/cleanup.ts`).
+
+## 3. ספק ה-SMS
+
+- **ימות המשיח (שכבר בשימוש ל-IVR) לא נבחר:** אין להם endpoint ייעודי נקי לשליחת SMS בודד; מה שנמצא (`RunCampaign?withSMS=1`) הוא מנגנון קמפיינים והטוקן שלו הוא `מספר-מערכת:סיסמת-ניהול` — לא רוצים לשים סיסמת ניהול של ימות בקוד השליחה.
+- **019sms נבחר כברירת מחדל לכתיבה** (יש לו תיעוד HTTP ציבורי + API ייעודי ל-OTP): `packages/shared/src/sms019.ts`. **כתוב לפי התיעוד הציבורי ולא נבדק מול חשבון אמיתי.** מה שידוע מהתיעוד (`docs.019sms.co.il/sms/send-sms.html`): `POST https://019sms.co.il/api`, גוף JSON `{sms:{user:{username}, source, destinations:{phone:[{$:{id}, _:"5xxxxxxxx"}]}, message}}`, הצלחה = `status: 0`, `source` עד 11 תווים (ספרות/אותיות באנגלית), endpoint בדיקות `https://019sms.co.il/api/test`.
+- **⚠️ לא ידוע מהתיעוד:** איך מעבירים את ה-API token. המימוש שולח `Authorization: Bearer <token>` (ניחוש סביר). **חובה לאמת מול התיעוד/תמיכה של החשבון עצמו לפני הדלקה**, ולתקן את `headers` ב-`Sms019Provider.send` אם שונה. ייתכן גם שדרוש אישור/רישום של שם השולח (`SMS_SENDER_ID`) — לברר עם הספק.
+- אפשר להחליף ספק: מספיק לממש `SmsProvider` (`send(phone, message)`) ולהוסיף `case` ב-`getOtpSmsProvider()` (`packages/shared/src/sms.ts`).
+- **התראות (ביטול/שינוי/תזכורת) נשארות בלי SMS** — החלטה קיימת. לכן `getOtpSmsProvider()` נפרד מ-`getSmsProvider()`: הדלקת `SMS_PROVIDER=019` שולחת SMS רק לקודי כניסה ולא מציפה SMS על כל ביטול/רשימת המתנה (עולה כסף להודעה).
+
+## 4. מה נבדק ומה לא (חשוב!)
+
+נבדק:
+- `tsc` נקי (web, worker); 25 טסטים עוברים (`pnpm test` ב-`apps/web`): קודים, HMAC, השוואה, לוגיקת הדגל, מבנה ה-payload של 019, בחירת ספק.
+- מול ה-DB האמיתי (מספר בדיוני שנמחק): קוד שגוי נדחה; נכון מתקבל; חד-פעמי; קוד חדש מבטל ישן; 5 ניחושים ואז נעילה (גם הקוד הנכון נדחה); קוד שפג תוקפו נדחה; הקוד לא נשמר בגלוי.
+- מצב ברירת המחדל בשרת החי: `/login` מציג סיסמה, `/register` ו-`/forgot-password` עובדים, `/admin` ללא סשן מפנה ל-`/login/admin`.
+- מצב `sms_code` (instance זמני על `127.0.0.1:3100`, נעצר): `/login` מציג "שלחו לי קוד" ובלי שדה סיסמה; קישור "כניסת מנהל"; `/login/admin` עם סיסמה; `/register`, `/forgot-password`, `/reset-password` ← 307 ל-`/login`.
+
+**לא נבדק:**
+- **הזרימה האינטראקטיבית בדפדפן** (הקלדת טלפון ← קוד ← שם ← כניסה): נבדק רק שהעמוד נטען בשלב הראשון. ייתכנו באגי UI/סשן. לבדוק קודם במצב `mock`.
+- שליחה אמיתית ב-SMS, פורמט ה-auth של 019sms, שם שולח מאושר.
+- `redirect()` אחרי כניסה מוצלחת ויצירת הסשן (הקוד עצמו זהה למה ש-`loginAction` עושה, אך לא הורץ).
+
+## 5. מה נשאר לעשות (לפי סדר)
+
+1. **לבחור/לפתוח חשבון SMS** (019sms או אחר) ולקבל: שם משתמש, token, ובירור שם שולח מאושר. לוודא את פורמט ה-auth (סעיף 3).
+2. **בדיקה במצב `mock`** (בלי ספק אמיתי): ב-`apps/web/.env` להוסיף `CUSTOMER_LOGIN_MODE="sms_code"`, `SMS_PROVIDER="mock"`, `SMS_MOCK_REVEAL_CODE="true"` ← `npx pm2 restart barberbook-web` (אין צורך ב-build — המשתנים נקראים בזמן ריצה) ← להיכנס מהדפדפן, הקוד מודפס בלוג: `npx pm2 logs barberbook-web --lines 20 --nostream`. לבדוק: לקוח קיים, מספר חדש (שלב שם + התראת "לקוח חדש" למנהל), קוד שגוי, שליחה חוזרת, מספר חסום (`/admin/blocked-customers`), מספר המנהל, כניסת מנהל ב-`/login/admin`. **להסיר `SMS_MOCK_REVEAL_CODE` אחרי.**
+3. **הרצת ניסיון מול ה-endpoint של הבדיקות של 019:** `SMS_PROVIDER="019"`, `SMS_019_USERNAME`, `SMS_019_TOKEN`, `SMS_SENDER_ID`, `SMS_019_ENDPOINT="https://019sms.co.il/api/test"`; לוודא שאין שגיאה ב-`pm2 logs` (`[sms-login] failed to send code`). לתקן `headers` אם צריך.
+4. **הדלקה אמיתית:** להסיר את `SMS_019_ENDPOINT`, restart, ולבדוק עם טלפון אמיתי.
+5. **החלטות/שיפורים פתוחים:**
+   - להגביל ל-05X (ניידים) בלבד? כיום `PHONE_NUMBER_REGEX` מקבל גם קווי (`03…`) שלא יקבלו SMS. לקוחות IVR עם קו נייח לא יוכלו להיכנס לאפליקציה.
+   - קוד אוטומטי בטלפון (WebOTP: שורה אחרונה `@דומיין #קוד` בהודעה).
+   - `x-forwarded-for` משמש למגבלת ה-IP — נכון רק מאחורי proxy אמין (ngrok/nginx).
+   - המגבלות בזיכרון-תהליך: מתאפסות בכל restart ולא משותפות בין instances (כמו שאר ה-rate limit).
+   - אחרי שהמצב יציב: למחוק את קוד הרישום/איפוס הישן (`register`/`forgot-password`/`reset-password`, `PasswordResetCode`) — כרגע נשאר בכוונה כדי שיהיה rollback.
+   - לעדכן את `privacy/PRIVACY-COMPLIANCE-AMENDMENT13.md` (אימות בעלות על מספר) ולהוסיף בטופס ההתחברות הודעת פרטיות אם נדרש.
+   - איפוס סיסמת מנהל: אין UI; דרך סקריפט (ראו CLAUDE.md).
+   - פריסת פרודקשן חדשה (Docker): להריץ `pnpm db:migrate` (migration `20260922130000_add_login_codes`) ולהגדיר את המשתנים ב-`.env`.
+
+## 6. Rollback
+
+להסיר/לשנות את `CUSTOMER_LOGIN_MODE` (או `SMS_PROVIDER`) ב-`apps/web/.env` ← `npx pm2 restart barberbook-web`. חוזרים מיד לכניסה בסיסמה (הלקוחות הקיימים שמרו את הסיסמאות; לקוחות שנוצרו דרך IVR/SMS מחזיקים סיסמה אקראית ויצטרכו את מסלול איפוס הסיסמה הישן, שעדיין תלוי ב-SMS).
+
+## 7. קבצים
+
+חדש: `apps/web/src/lib/actions/smsLogin.ts`, `lib/smsLoginCore.ts`, `lib/loginMode.ts`, `app/(auth)/login/{SmsLoginForm,PasswordLoginForm}.tsx`, `app/(auth)/login/admin/page.tsx`, `components/AuthIcons.tsx`, `packages/shared/src/sms019.ts`, `apps/worker/src/cleanup.ts`, טסטים `lib/smsLoginCore.test.ts` + `lib/sms019.test.ts`, migration `20260922130000_add_login_codes`.
+שונה: `app/(auth)/login/page.tsx` (שרת, `force-dynamic`), `lib/actions/auth.ts`, `lib/auth/jwt.ts` (`signPhoneProof`/`verifyPhoneProof`), `proxy.ts`, `packages/shared/src/{sms,index}.ts`, `apps/worker/src/index.ts`, `packages/db/prisma/schema.prisma` (`LoginCode`).

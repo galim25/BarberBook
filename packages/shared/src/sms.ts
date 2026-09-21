@@ -1,3 +1,5 @@
+import { Sms019Provider } from "./sms019";
+
 export interface SmsProvider {
   send(phoneNumber: string, message: string): Promise<void>;
 }
@@ -30,4 +32,29 @@ export class NoopSmsProvider implements SmsProvider {
 // SMS_MOCK_REVEAL_CODE="true" is also set.
 export function getSmsProvider(): SmsProvider {
   return process.env.SMS_PROVIDER === "mock" ? new MockSmsProvider() : new NoopSmsProvider();
+}
+
+/**
+ * Provider for one-time login codes (customer sign-in, see docs/SMS-LOGIN.md).
+ * Deliberately separate from getSmsProvider(): notifications stay in-app/push
+ * only by product decision, so switching on a real SMS account for login codes
+ * must NOT start texting every cancellation / waitlist broadcast (that costs
+ * money per message). SMS_PROVIDER: "019" = real 019sms, "mock" = log only
+ * (set SMS_MOCK_REVEAL_CODE="true" to see the code in the server log), unset =
+ * nothing is sent (and customer SMS login stays disabled, see loginMode.ts).
+ */
+export function getOtpSmsProvider(): SmsProvider {
+  switch (process.env.SMS_PROVIDER) {
+    case "019":
+      return new Sms019Provider({
+        username: process.env.SMS_019_USERNAME ?? "",
+        token: process.env.SMS_019_TOKEN ?? "",
+        sender: process.env.SMS_SENDER_ID ?? "",
+        endpoint: process.env.SMS_019_ENDPOINT || undefined,
+      });
+    case "mock":
+      return new MockSmsProvider();
+    default:
+      return new NoopSmsProvider();
+  }
 }

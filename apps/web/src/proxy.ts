@@ -6,6 +6,7 @@ import {
   signSession,
   verifySessionToken,
 } from "@/lib/auth/jwt";
+import { isSmsLoginEnabled } from "@/lib/loginMode";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -16,10 +17,17 @@ export async function proxy(request: NextRequest) {
   const isAccountRoute = pathname.startsWith("/account");
   const isAuthRoute = ["/login", "/register"].includes(pathname);
 
+  // SMS-login mode (docs/SMS-LOGIN.md): no registration / password-reset pages for customers.
+  const isRetiredAuthRoute =
+    isSmsLoginEnabled() && ["/register", "/forgot-password", "/reset-password"].includes(pathname);
+
   let response: NextResponse;
 
-  if (isAdminRoute && !session) {
+  if (isRetiredAuthRoute) {
     response = NextResponse.redirect(new URL("/login", request.url));
+  } else if (isAdminRoute && !session) {
+    // /login/admin (password form) works in both login modes; plain /login is the customer SMS form in SMS mode.
+    response = NextResponse.redirect(new URL("/login/admin", request.url));
   } else if (isAdminRoute && session && session.role !== "administrator") {
     // A logged-in non-admin hitting /admin must not be redirected to
     // /login: the auth-route rule below would immediately bounce an
@@ -54,5 +62,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/account/:path*", "/login", "/register"],
+  matcher: ["/admin/:path*", "/account/:path*", "/login", "/register", "/forgot-password", "/reset-password"],
 };

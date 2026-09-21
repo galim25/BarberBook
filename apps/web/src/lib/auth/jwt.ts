@@ -55,3 +55,32 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
     return null;
   }
 }
+
+const PHONE_PROOF_PURPOSE = "phone-verified";
+const PHONE_PROOF_TTL_SECONDS = 10 * 60;
+
+/**
+ * Signed, short-lived proof that the holder just entered a valid SMS code for
+ * this phone number. Only used between "code verified" and "name entered" for a
+ * brand-new customer — so the number's existence as a customer is never revealed
+ * before ownership is proven.
+ */
+export async function signPhoneProof(phone_number: string): Promise<string> {
+  return new SignJWT({ purpose: PHONE_PROOF_PURPOSE })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(phone_number)
+    .setIssuedAt()
+    .setExpirationTime(`${PHONE_PROOF_TTL_SECONDS}s`)
+    .sign(getSecretKey());
+}
+
+export async function verifyPhoneProof(token: string): Promise<string | null> {
+  try {
+    const { payload } = await jwtVerify(token, getSecretKey());
+    if (payload.purpose !== PHONE_PROOF_PURPOSE || typeof payload.sub !== "string") return null;
+    return payload.sub;
+  } catch {
+    return null;
+  }
+}
+

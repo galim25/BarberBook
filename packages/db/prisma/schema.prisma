@@ -289,6 +289,22 @@ model Notification {
  * (e.g. phone + desktop). endpoint is unique per browser install, so
  * re-subscribing the same device upserts instead of duplicating.
  */
+/// One-time SMS login code (docs/SMS-LOGIN.md). Keyed by phone number, not user, because a brand-new
+/// customer has no User row yet. Only an HMAC of the code is stored, never the code itself.
+model LoginCode {
+  id           String    @id @default(cuid())
+  phone_number String
+  code_hash    String
+  expires_at   DateTime
+  attempts     Int       @default(0)
+  consumed_at  DateTime?
+  created_at   DateTime  @default(now())
+
+  @@index([phone_number, created_at])
+  @@index([expires_at])
+  @@map("login_codes")
+}
+
 model PushSubscription {
   id         String   @id @default(cuid())
   user_id    String

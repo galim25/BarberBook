@@ -8,6 +8,7 @@ import { createSession, destroySession } from "@/lib/auth/session";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { registerUserCore } from "@/lib/actions/registerCore";
+import { isSmsLoginEnabled } from "@/lib/loginMode";
 import {
   registerSchema,
   loginSchema,
@@ -21,7 +22,11 @@ const TOO_MANY_ATTEMPTS_ERROR = "יותר מדי ניסיונות, נסה/י ש�
 
 export type ActionState = { error?: string; success?: boolean };
 
+const SMS_MODE_UNAVAILABLE_ERROR = "האפשרות הזו אינה זמינה — יש להתחבר עם קוד שנשלח ב-SMS";
+
 export async function registerAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  // SMS-login mode: an unverified password sign-up would let anyone claim a phone number they don't own.
+  if (isSmsLoginEnabled()) return { error: SMS_MODE_UNAVAILABLE_ERROR };
   const parsed = registerSchema.safeParse({
     full_name: formData.get("full_name"),
     phone_number: formData.get("phone_number"),
@@ -64,7 +69,9 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   }
 
   const user = await prisma.user.findUnique({ where: { phone_number } });
-  if (!user || !(await verifyPassword(password, user.password_hash))) {
+  // SMS-login mode: passwords are for the administrator only; customers sign in with a code.
+  const passwordLoginAllowed = !isSmsLoginEnabled() || user?.role === "administrator";
+  if (!user || !passwordLoginAllowed || !(await verifyPassword(password, user.password_hash))) {
     return { error: "מספר טלפון או סיסמה שגויים" };
   }
 
@@ -85,6 +92,8 @@ export async function forgotPasswordAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  // SMS-login mode: also stops this from being used to make the server text arbitrary numbers.
+  if (isSmsLoginEnabled()) return { error: SMS_MODE_UNAVAILABLE_ERROR };
   const parsed = forgotPasswordSchema.safeParse({ phone_number: formData.get("phone_number") });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "מספר טלפון לא תקין" };
@@ -112,6 +121,7 @@ export async function resetPasswordAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  if (isSmsLoginEnabled()) return { error: SMS_MODE_UNAVAILABLE_ERROR };
   const parsed = resetPasswordSchema.safeParse({
     phone_number: formData.get("phone_number"),
     code: formData.get("code"),
