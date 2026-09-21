@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma, Prisma } from "@barberbook/db";
-import { ISRAEL_TIME_ZONE, localDateToUtcMidnight, zonedTimeToUtc } from "@barberbook/shared";
+import { ISRAEL_TIME_ZONE, zonedTimeToUtc } from "@barberbook/shared";
 import { getSession } from "@/lib/auth/session";
 import { notifyAppointmentCancelled } from "@/lib/notifyCustomer";
 import { notifyWaitlistOfExtendedHours, notifyWaitlistOfNewWorkDay } from "@/lib/actions/waitlist";
@@ -37,7 +37,9 @@ async function requireAdminSession() {
 export async function getWorkDaysAdmin(barber_id: string): Promise<WorkDayWithBreaks[]> {
   if (!(await requireAdminSession())) return [];
   return prisma.workDay.findMany({
-    where: { barber_id, work_date: { gte: localDateToUtcMidnight() } },
+    // Filters by ends_at (not just the date) so a day whose hours already
+    // ended today drops off the list, not just once its date is in the past.
+    where: { barber_id, ends_at: { gte: new Date() } },
     orderBy: { work_date: "asc" },
     include: { breaks: true },
   });

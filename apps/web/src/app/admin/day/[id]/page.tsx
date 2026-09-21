@@ -6,13 +6,12 @@ import { getWorkDayDetail } from "@/lib/actions/workdays";
 import { getAppointmentsForWorkDay } from "@/lib/actions/adminAppointments";
 import { buildDayTimeline } from "@/lib/dayTimeline";
 import { EditHoursForm } from "./EditHoursForm";
-import { MoveAppointmentButton } from "./MoveAppointmentButton";
-import { CancelAppointmentButton } from "./CancelAppointmentButton";
 import { CreateManualAppointmentForm } from "./CreateManualAppointmentForm";
 import { DeleteWorkDayButton } from "./DeleteWorkDayButton";
 import { BlockDayToggle } from "./BlockDayToggle";
 import { PageHeader } from "@/components/PageHeader";
 import { AdminBrandHero } from "@/components/AdminBrandHero";
+import { QuickDayAppointments } from "../../QuickDayAppointments";
 
 function formatHHMM(d: Date) {
   return d.toLocaleTimeString("en-GB", {
@@ -75,55 +74,14 @@ export default async function AdminDayPage({ params }: { params: Promise<{ id: s
 
       <CreateManualAppointmentForm workDayId={workDay.id} barberId={workDay.barber_id} />
 
-      <div className="flex flex-col gap-2">
+      <div className="border-barber-teal bg-white flex flex-col gap-3 rounded-xl border p-4">
         <h2 className="text-ink font-bold">לוח היום ({appointments.length} תורים)</h2>
-        <ul className="flex flex-col gap-1">
-          {timeline.map((s, i) => {
-            if (s.kind === "free") {
-              return (
-                <li key={i} className="rounded-xl p-2 text-sm text-slate-muted">
-                  {formatHHMM(s.starts_at)}–{formatHHMM(s.ends_at)} · פנוי
-                </li>
-              );
-            }
-            if (s.kind === "break" || s.kind === "blocked") {
-              return (
-                <li
-                  key={i}
-                  className="border-barber-teal/40 bg-white rounded-xl border border-dashed p-2 text-sm text-slate-muted"
-                >
-                  {formatHHMM(s.starts_at)}–{formatHHMM(s.ends_at)} ·{" "}
-                  {s.kind === "break" ? "הפסקה" : "חסום"}
-                </li>
-              );
-            }
-            return (
-              <li
-                key={s.id}
-                className="border-barber-teal/20 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b py-3 text-sm last:border-b-0"
-              >
-                <div className="min-w-0">
-                  <p className="text-ink truncate font-bold">
-                    {formatHHMM(s.starts_at)} · {s.customer_name}
-                  </p>
-                  <p className="text-slate-muted truncate text-xs">
-                    {s.service_name}
-                    {s.attendee_type === "child" && ` (עבור: ${s.attendee_name})`}
-                    {!s.has_account && " · תור ידני"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <MoveAppointmentButton
-                    appointmentId={s.id}
-                    workDayId={workDay.id}
-                    serviceId={s.service_id}
-                  />
-                  <CancelAppointmentButton appointmentId={s.id} />
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <QuickDayAppointments
+          workDayId={workDay.id}
+          barberId={workDay.barber_id}
+          timeline={timeline}
+          showMoveButton
+        />
       </div>
 
     </main>

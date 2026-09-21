@@ -54,7 +54,7 @@ export function MoveAppointmentButton({
 
   if (!open) {
     return (
-      <button onClick={start} className="text-barber-teal text-sm underline">
+      <button onClick={start} className="bg-barber-teal text-cream-text rounded-full px-3 py-1 text-xs font-medium">
         העברת התור לשעה אחרת
       </button>
     );

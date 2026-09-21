@@ -17,9 +17,13 @@ function formatTime(iso: string) {
 export function CreateManualAppointmentForm({
   workDayId,
   barberId,
+  initialStartsAt,
+  onCancel,
 }: {
   workDayId: string;
   barberId: string;
+  initialStartsAt?: string;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const [services, setServices] = useState<ServiceOption[]>([]);
@@ -44,8 +48,11 @@ export function CreateManualAppointmentForm({
     setSlots([]);
     setStartsAt("");
     if (!serviceId) return;
-    getSlotsForDate(workDayId, serviceId).then(setSlots);
-  }, [serviceId, workDayId]);
+    getSlotsForDate(workDayId, serviceId).then((s) => {
+      setSlots(s);
+      setStartsAt(initialStartsAt && s.includes(initialStartsAt) ? initialStartsAt : "");
+    });
+  }, [serviceId, workDayId, initialStartsAt]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -137,6 +144,12 @@ export function CreateManualAppointmentForm({
       >
         {pending ? "שומר..." : "קביעת תור"}
       </button>
+
+      {onCancel && (
+        <button type="button" onClick={onCancel} className="text-slate-muted text-sm underline">
+          ביטול
+        </button>
+      )}
     </form>
   );
 }

@@ -24,7 +24,11 @@ export function CancelAppointmentButton({ appointmentId }: { appointmentId: stri
 
   return (
     <div className="inline-flex flex-col gap-1">
-      <button onClick={cancel} disabled={pending} className="text-sm text-red-600 underline disabled:opacity-50">
+      <button
+        onClick={cancel}
+        disabled={pending}
+        className="bg-barber-teal text-cream-text rounded-full px-3 py-1 text-xs font-medium disabled:opacity-50"
+      >
         {pending ? "מבטל..." : "ביטול תור"}
       </button>
       {error && <p className="text-sm text-red-600">{error}</p>}

@@ -2,13 +2,16 @@ import Link from "next/link";
 import { ISRAEL_TIME_ZONE } from "@barberbook/shared";
 import { requireAdmin } from "@/lib/auth/session";
 import { logoutAction } from "@/lib/actions/auth";
-import { getWorkDaysAdmin } from "@/lib/actions/workdays";
+import { getWorkDaysAdmin, getWorkDayDetail } from "@/lib/actions/workdays";
 import { getBarbersAdmin } from "@/lib/actions/barbers";
+import { getAppointmentsForWorkDay } from "@/lib/actions/adminAppointments";
 import { getPendingCancellationCount } from "@/lib/actions/cancellationRequests";
 import { getUnreadAdminNotificationCount } from "@/lib/actions/adminNotifications";
 import { getPendingBookingRequestCount } from "@/lib/actions/bookingRequests";
+import { buildDayTimeline } from "@/lib/dayTimeline";
 import { OpenWorkDayForm } from "./OpenWorkDayForm";
 import { DeleteAllWorkDaysButton } from "./DeleteAllWorkDaysButton";
+import { QuickDayAppointments } from "./QuickDayAppointments";
 import { BlockDayToggle } from "./day/[id]/BlockDayToggle";
 import { PageHeader } from "@/components/PageHeader";
 import { AdminBrandHero } from "@/components/AdminBrandHero";
@@ -48,21 +51,33 @@ export default async function AdminPage({
   const unreadNotifications = await getUnreadAdminNotificationCount();
   const pendingBookingRequests = await getPendingBookingRequestCount();
 
+  const nearestWorkDay = workDays[0];
+  const nearestWorkDayDetail = nearestWorkDay ? await getWorkDayDetail(nearestWorkDay.id) : null;
+  const nearestDayTimeline = nearestWorkDayDetail
+    ? buildDayTimeline(
+        nearestWorkDayDetail.starts_at,
+        nearestWorkDayDetail.ends_at,
+        nearestWorkDayDetail.breaks,
+        nearestWorkDayDetail.blocked_times,
+        await getAppointmentsForWorkDay(nearestWorkDayDetail.id),
+      )
+    : null;
+
   return (
     <main dir="rtl" className="bg-cream mx-auto flex min-h-screen max-w-md flex-col gap-4 p-6">
       <PageHeader title={`היי ${session.full_name}`} topBanner={<AdminBrandHero />} />
-      <AdminMenu
-        items={[
-          { href: "/admin/booking-requests", label: "בקשות תורים", count: pendingBookingRequests },
-          { href: "/admin/cancellation-requests", label: "בקשות ביטול", count: pendingCancellations },
-          { href: "/admin/notifications", label: "התראות", count: unreadNotifications },
-          { href: "/admin/blocked-customers", label: "לקוחות חסומים" },
-          { href: "/admin/waitlist", label: "רשימת המתנה" },
-          { href: "/admin/announcements", label: "הודעות כלליות" },
-          { href: "/admin/settings", label: "הגדרות" },
-          { href: "/admin/barbers", label: "ניהול ספרים" },
-        ]}
-      />
+      <div className="flex items-center justify-between">
+        <AdminMenu
+          items={[
+            { href: "/admin/blocked-customers", label: "לקוחות חסומים" },
+            { href: "/admin/waitlist", label: "רשימת המתנה" },
+            { href: "/admin/announcements", label: "הודעות כלליות" },
+            { href: "/admin/settings", label: "הגדרות" },
+            { href: "/admin/barbers", label: "ניהול ספרים" },
+          ]}
+        />
+        <DeleteAllWorkDaysButton barberId={selectedBarber.id} barberName={selectedBarber.full_name} />
+      </div>
 
       {barbers.length > 1 && (
         <div className="flex flex-wrap justify-start gap-2">
@@ -80,6 +95,48 @@ export default async function AdminPage({
               {!b.is_active && " (לא פעיל)"}
             </Link>
           ))}
+        </div>
+      )}
+
+      <div className="mx-auto flex w-64 flex-col gap-2">
+        {[
+          { href: "/admin/booking-requests", label: "בקשות תורים", count: pendingBookingRequests },
+          { href: "/admin/cancellation-requests", label: "בקשות ביטול", count: pendingCancellations },
+          { href: "/admin/notifications", label: "התראות", count: unreadNotifications },
+        ].map((b) => (
+          <Link
+            key={b.href}
+            href={b.href}
+            className="bg-barber-teal text-cream-text relative flex items-center justify-center rounded-full px-4 py-2 text-[15px] font-medium"
+          >
+            {b.label}
+            {!!b.count && (
+              <span className="bg-cream-text text-barber-teal absolute left-3 rounded-full px-2 py-0.5 text-xs font-bold">
+                {b.count}
+              </span>
+            )}
+          </Link>
+        ))}
+      </div>
+
+      {nearestWorkDayDetail && nearestDayTimeline && (
+        <div className="border-barber-teal bg-white flex flex-col gap-3 rounded-xl border p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-ink font-bold">
+              התורים של {formatWorkDate(nearestWorkDayDetail.work_date)}
+            </h2>
+            <Link
+              href={`/admin/day/${nearestWorkDayDetail.id}`}
+              className="bg-barber-teal text-cream-text rounded-full px-3 py-1 text-xs font-medium"
+            >
+              ניהול היום
+            </Link>
+          </div>
+          <QuickDayAppointments
+            workDayId={nearestWorkDayDetail.id}
+            barberId={selectedBarber.id}
+            timeline={nearestDayTimeline}
+          />
         </div>
       )}
 
@@ -131,7 +188,6 @@ export default async function AdminPage({
         <Link href="/admin/print-all" className="text-barber-teal text-sm underline">
           הדפסה / שמירת עותק כ-PDF של כל היומן
         </Link>
-        <DeleteAllWorkDaysButton barberId={selectedBarber.id} barberName={selectedBarber.full_name} />
       </div>
 
       <form action={logoutAction}>
