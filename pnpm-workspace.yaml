@@ -8,7 +8,10 @@ overrides:
   postcss: "^8.5.23"
   # next@16.2.12's optional sharp dependency (0.34.5) has 4 HIGH libvips CVEs
   # (GHSA-f88m-g3jw-g9cj) fixed in 0.35.0 — force the patched version.
-  sharp: "^0.35.3"
+  # GHSA-rgj7-g3m4-5g8c / CVE-2026-84383 — libheif RCE processing untrusted
+  # AVIF/HEIF on glibc Linux, fixed in 0.35.4. Runtime dep via next's image
+  # optimizer, not build-time only like the others here.
+  sharp: "^0.35.4"
   # Transitive via minimatch (eslint/glob toolchain) at two major versions —
   # both had a HIGH DoS via unbounded expansion (GHSA-v6h2-p8h4-qcjw), fixed
   # in 1.1.17 / 5.0.8 respectively. Not a runtime dependency of the app.
@@ -19,8 +22,11 @@ overrides:
   nanoid: "^3.3.17"
   # GHSA-5p4m-2wfm-xmqj / CVE-2026-59870 — quadratic CPU consumption in
   # !!omap resolution, fix from 3.x not backported to 4.x. Fixed in 4.3.1.
-  # Transitive via eslint's @eslint/eslintrc.
-  js-yaml: "^4.3.1"
+  # GHSA-2883-xcg3-v3hh / CVE-2026-84375 — maxTotalMergeKeys doesn't count
+  # empty-mapping merge sources, so CPU DoS via merge keys is still possible
+  # despite the limit. Fixed in 4.3.2. Transitive via eslint's @eslint/eslintrc,
+  # build/lint-time only.
+  js-yaml: "^4.3.2"
   # Unbounded memory growth (no cache eviction) + a prototype-write crash via
   # untrusted browserslist-stats.json. Fixed in 4.28.7. Transitive via
   # eslint-config-next/@babel and next/@serwist's styled-jsx — build-time only.
