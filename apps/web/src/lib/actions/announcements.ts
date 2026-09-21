@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@barberbook/db";
+import { prisma, sendPushToCustomers } from "@barberbook/db";
 import { getSession } from "@/lib/auth/session";
 
 async function requireAdminSession() {
@@ -34,6 +34,13 @@ export async function createAnnouncementAction(input: {
 
   await prisma.announcement.create({
     data: { title, content, published_by_user_id: session.sub },
+  });
+
+  // Device push only (no per-customer Notification row — announcements are shown in-app on /account, see PRD US-009).
+  await sendPushToCustomers({
+    title: `הודעה חדשה מהספר: ${title}`,
+    body: content.length > 120 ? `${content.slice(0, 117)}...` : content,
+    url: "/account",
   });
 
   revalidatePath("/admin/announcements");

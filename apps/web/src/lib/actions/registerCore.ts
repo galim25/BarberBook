@@ -1,5 +1,6 @@
 import { prisma } from "@barberbook/db";
 import { hashPassword } from "@/lib/auth/password";
+import { notifyAdminsOfNewCustomer } from "@/lib/notifyAdmin";
 
 export type RegisterCoreResult =
   | { outcome: "created"; user_id: string }
@@ -34,6 +35,11 @@ export async function registerUserCore(
       role: "customer",
     },
   });
+
+  // The account already exists — a failure to tell the barber must not turn a successful sign-up into an error.
+  await notifyAdminsOfNewCustomer({ customer_name: full_name }).catch((err) =>
+    console.error("[notify] failed to notify admins of new customer:", err),
+  );
 
   return { outcome: "created", user_id: user.id };
 }

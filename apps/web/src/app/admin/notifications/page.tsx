@@ -32,7 +32,7 @@ export default async function AdminNotificationsPage() {
         <MarkReadButton hasUnread={hasUnread} />
       </div>
 
-      <PushNotificationToggle />
+      <PushNotificationToggle audience="admin" />
 
       <div className="flex flex-col gap-2">
         {notifications.length === 0 && <p className="text-slate-muted">אין התראות.</p>}

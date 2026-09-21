@@ -2,11 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma, Prisma } from "@barberbook/db";
-import { getSmsProvider, formatIsraelDate, formatIsraelTime, isServiceAllowedForBarber } from "@barberbook/shared";
+import { formatIsraelDate, formatIsraelTime, isServiceAllowedForBarber } from "@barberbook/shared";
 import { getSession } from "@/lib/auth/session";
 import { isSlotAvailable, type Interval } from "@/lib/availability";
 import { runSerializable } from "@/lib/serializableTransaction";
-import { notifyAppointmentCancelled } from "@/lib/notifyCustomer";
+import { notifyAppointmentCancelled, sendCustomerNotification } from "@/lib/notifyCustomer";
 import { notifyWaitlistOfFreedSlot } from "@/lib/actions/waitlist";
 import type { BookingResult } from "@/lib/actions/booking";
 
@@ -122,16 +122,12 @@ export async function adminRescheduleAppointmentAction(
     );
 
     if (notify) {
-      await getSmsProvider().send(notify.phone_number, notify.message);
-      await prisma.notification.create({
-        data: {
-          user_id: notify.user_id,
-          appointment_id: notify.appointment_id,
-          type: "appointment_changed",
-          content: notify.message,
-          status: "sent",
-          sent_at: new Date(),
-        },
+      await sendCustomerNotification({
+        user_id: notify.user_id,
+        phone_number: notify.phone_number,
+        message: notify.message,
+        type: "appointment_changed",
+        appointment_id: notify.appointment_id,
       });
     }
 
@@ -172,7 +168,7 @@ export async function cancelAppointmentAction(appointment_id: string): Promise<B
   }
 
   if (appointment.starts_at >= new Date()) {
-    await notifyWaitlistOfFreedSlot(appointment.starts_at, appointment.service.name);
+    await notifyWaitlistOfFreedSlot(appointment.starts_at, appointment.service.name, appointment.booked_by_user_id);
   }
 
   revalidatePath(`/admin/day/${appointment.work_day_id}`);

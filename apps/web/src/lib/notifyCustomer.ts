@@ -1,4 +1,4 @@
-import { prisma, type NotificationType } from "@barberbook/db";
+import { prisma, sendPushToUser, type NotificationType } from "@barberbook/db";
 import { getSmsProvider, formatIsraelDate, formatIsraelTime } from "@barberbook/shared";
 
 type CustomerNotificationInput = {
@@ -17,7 +17,25 @@ type CustomerNotificationInput = {
   cancellation_request_id?: string;
 };
 
-/** SMS (mock provider — real delivery is Phase 4) + a persisted Notification row. The one place that writes to Notification, so every customer-facing message stays consistent. */
+/** Push title + the page a tap opens, per notification type (customer-facing types only). */
+function pushMetaFor(type: NotificationType): { title: string; url: string } {
+  switch (type) {
+    case "appointment_changed":
+      return { title: "שינוי בתור שלך", url: "/account/appointments" };
+    case "cancellation_decision":
+      return { title: "בקשת הביטול שלך", url: "/account/appointments" };
+    case "booking_decision":
+      return { title: "בקשת התור שלך", url: "/account/appointments" };
+    case "appointment_reminder":
+      return { title: "תזכורת לתור", url: "/account/appointments" };
+    case "waitlist_slot_available":
+      return { title: "יש תור פנוי", url: "/account/book" };
+    default:
+      return { title: "BarberBook", url: "/account" };
+  }
+}
+
+/** SMS (mock provider — real delivery is Phase 4) + a persisted Notification row + a real device push. The one place that writes to Notification for customers, so every customer-facing message stays consistent. */
 export async function sendCustomerNotification(input: CustomerNotificationInput): Promise<void> {
   await getSmsProvider().send(input.phone_number, input.message);
   await prisma.notification.create({
@@ -31,6 +49,7 @@ export async function sendCustomerNotification(input: CustomerNotificationInput)
       sent_at: new Date(),
     },
   });
+  await sendPushToUser(input.user_id, { ...pushMetaFor(input.type), body: input.message });
 }
 
 type CancelledAppointmentInfo = {

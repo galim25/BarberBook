@@ -22,7 +22,7 @@ function urlBase64ToUint8Array(base64Url: string): Uint8Array {
 
 type Status = "checking" | "unsupported" | "ios-not-installed" | "off" | "on" | "denied";
 
-export function PushNotificationToggle() {
+export function PushNotificationToggle({ audience }: { audience: "admin" | "customer" }) {
   const [status, setStatus] = useState<Status>("checking");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
@@ -117,8 +117,9 @@ export function PushNotificationToggle() {
       {status === "off" && (
         <>
           <p className="text-slate-muted mt-1">
-            הפעלה חד-פעמית במכשיר הזה — תקבלו התראה על כל תור חדש, בקשת תור ובקשת ביטול, גם כשהאפליקציה
-            סגורה.
+            {audience === "admin"
+              ? "הפעלה חד-פעמית במכשיר הזה — תקבלו התראה על כל תור חדש, שינוי בתור, בקשת תור ובקשת ביטול, גם כשהאפליקציה סגורה."
+              : "הפעלה חד-פעמית במכשיר הזה — תקבלו התראה על שינוי או ביטול תור, תור שהתפנה, ימים חדשים והודעות מהספר, גם כשהאפליקציה סגורה."}
           </p>
           <button
             onClick={turnOn}

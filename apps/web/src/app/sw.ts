@@ -31,13 +31,15 @@ self.addEventListener("push", (event: PushEvent) => {
       body: data?.body,
       icon: "/web-app-manifest-192x192.png",
       badge: "/web-app-manifest-192x192.png",
-      data: { url: data?.url ?? "/admin" },
+      dir: "rtl",
+      lang: "he",
+      data: { url: data?.url ?? "/" },
     }),
   );
 });
 
 self.addEventListener("notificationclick", (event: NotificationEvent) => {
   event.notification.close();
-  const url = (event.notification.data as { url?: string } | undefined)?.url ?? "/admin";
+  const url = (event.notification.data as { url?: string } | undefined)?.url ?? "/";
   event.waitUntil(self.clients.openWindow(url));
 });

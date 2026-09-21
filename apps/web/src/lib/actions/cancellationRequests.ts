@@ -6,7 +6,7 @@ import { formatIsraelDate, formatIsraelTime } from "@barberbook/shared";
 import { getSession } from "@/lib/auth/session";
 import { sendCustomerNotification } from "@/lib/notifyCustomer";
 import { notifyWaitlistOfFreedSlot } from "@/lib/actions/waitlist";
-import { notifyAdminsOfCancellationRequest } from "@/lib/notifyAdmin";
+import { notifyAdminsOfCancellationRequest, notifyAdminsOfCustomerCancellation } from "@/lib/notifyAdmin";
 import { getRequiresApproval } from "@/lib/actions/settings";
 import type { BookingResult } from "@/lib/actions/booking";
 
@@ -46,7 +46,13 @@ export async function requestCancellationAction(appointment_id: string): Promise
   if (!(await getRequiresApproval())) {
     await prisma.appointment.update({ where: { id: appointment_id }, data: { status: "cancelled" } });
     if (appointment.starts_at >= new Date()) {
-      await notifyWaitlistOfFreedSlot(appointment.starts_at, appointment.service.name);
+      await notifyAdminsOfCustomerCancellation({
+        appointment_id: appointment.id,
+        service_name: appointment.service.name,
+        customer_name: session.full_name,
+        starts_at: appointment.starts_at,
+      });
+      await notifyWaitlistOfFreedSlot(appointment.starts_at, appointment.service.name, appointment.booked_by_user_id);
     }
     revalidatePath("/account/appointments");
     return { success: true };
@@ -137,7 +143,11 @@ async function decideCancellationRequest(
       data: { status: "cancelled" },
     });
     if (request.appointment.starts_at >= new Date()) {
-      await notifyWaitlistOfFreedSlot(request.appointment.starts_at, request.appointment.service.name);
+      await notifyWaitlistOfFreedSlot(
+        request.appointment.starts_at,
+        request.appointment.service.name,
+        request.appointment.booked_by_user_id,
+      );
     }
   }
 

@@ -47,6 +47,7 @@ enum NotificationType {
   booking_decision
   booking_request_pending
   cancellation_request_pending
+  customer_registered
 }
 
 enum NotificationStatus {

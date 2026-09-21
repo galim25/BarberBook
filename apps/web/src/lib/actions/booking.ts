@@ -9,7 +9,11 @@ import {
 import { getSession } from "@/lib/auth/session";
 import { findAvailableSlots, isSlotAvailable, type Interval } from "@/lib/availability";
 import { runSerializable } from "@/lib/serializableTransaction";
-import { notifyAdminsOfNewBooking, notifyAdminsOfBookingRequest } from "@/lib/notifyAdmin";
+import {
+  notifyAdminsOfNewBooking,
+  notifyAdminsOfBookingRequest,
+  notifyAdminsOfCustomerReschedule,
+} from "@/lib/notifyAdmin";
 import { getRequiresApproval } from "@/lib/actions/settings";
 import { bookAppointmentCore } from "@/lib/actions/bookingCore";
 
@@ -192,7 +196,7 @@ export async function rescheduleAppointmentAction(input: RescheduleInput): Promi
   }
 
   try {
-    await runSerializable(async (tx) => {
+    const moved = await runSerializable(async (tx) => {
       const appointment = await tx.appointment.findUniqueOrThrow({
         where: { id: input.appointment_id },
         include: { service: true },
@@ -244,7 +248,19 @@ export async function rescheduleAppointmentAction(input: RescheduleInput): Promi
           ends_at: new Date(starts_at.getTime() + appointment.service.duration_minutes * 60_000),
         },
       });
+
+      return {
+        appointment_id: appointment.id,
+        service_name: appointment.service.name,
+        old_starts_at: appointment.starts_at,
+        new_starts_at: starts_at,
+      };
     });
+
+    // The move already succeeded — a failure to notify the barber must not surface as "couldn't update the appointment".
+    await notifyAdminsOfCustomerReschedule({ ...moved, customer_name: session.full_name }).catch((err) =>
+      console.error("[notify] failed to notify admins of reschedule:", err),
+    );
     return { success: true };
   } catch (err) {
     if (err instanceof Error && err.message === "SLOT_TAKEN") {

@@ -7,6 +7,7 @@ import { isOnWaitlist } from "@/lib/actions/waitlist";
 import { LeaveWaitlistButton } from "./LeaveWaitlistButton";
 import { BrandHero } from "@/components/BrandHero";
 import { BsdBar } from "@/components/BsdBar";
+import { PushNotificationToggle } from "@/components/PushNotificationToggle";
 
 function formatDate(d: Date) {
   return d.toLocaleDateString("he-IL", { day: "numeric", month: "numeric", timeZone: ISRAEL_TIME_ZONE });
@@ -37,6 +38,8 @@ export default async function AccountPage() {
           התורים שלי
         </Link>
       </nav>
+
+      <PushNotificationToggle audience="customer" />
 
       {onWaitlist && (
         <div className="border-barber-teal mt-4 flex items-center justify-between rounded-xl border bg-white p-4">

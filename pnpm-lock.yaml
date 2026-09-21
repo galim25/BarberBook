@@ -128,7 +128,13 @@ importers:
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3
+      web-push:
+        specifier: ^3.6.7
+        version: 3.6.7(supports-color@7.2.0)
     devDependencies:
+      '@types/web-push':
+        specifier: ^3.6.4
+        version: 3.6.4
       prisma:
         specifier: ^6.2.1
         version: 6.19.3(typescript@5.9.3)

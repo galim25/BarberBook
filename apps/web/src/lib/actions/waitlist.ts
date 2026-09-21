@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@barberbook/db";
+import { prisma, sendPushToCustomers } from "@barberbook/db";
 import { formatIsraelDate, formatIsraelTime } from "@barberbook/shared";
 import { getSession } from "@/lib/auth/session";
 import { sendCustomerNotification } from "@/lib/notifyCustomer";
@@ -85,27 +85,43 @@ export async function removeWaitlistEntryAction(id: string): Promise<BookingResu
   return { success: true };
 }
 
-async function notifyAllWaitlistEntries(message: string): Promise<void> {
-  const entries = await prisma.waitlistEntry.findMany();
-  for (const entry of entries) {
-    await sendCustomerNotification({
-      user_id: entry.user_id,
-      phone_number: entry.phone_number,
-      message,
-      type: "waitlist_slot_available",
-    });
-  }
+async function notifyAllWaitlistEntries(message: string, exclude_user_id?: string | null): Promise<string[]> {
+  const entries = (await prisma.waitlistEntry.findMany()).filter((e) => e.user_id !== exclude_user_id);
+  // In parallel: each one now also does a network push, and the barber's action is waiting on this.
+  await Promise.all(
+    entries.map((entry) =>
+      sendCustomerNotification({
+        user_id: entry.user_id,
+        phone_number: entry.phone_number,
+        message,
+        type: "waitlist_slot_available",
+      }),
+    ),
+  );
+  return entries.map((e) => e.user_id);
 }
 
 /**
- * Called whenever a scheduled appointment frees up (admin cancels it, or a
- * customer's cancellation request is approved) — notifies every waitlist
- * entry that a slot opened at that time. Entries stay on the list afterward
- * (no auto-removal); the admin or the customer removes them explicitly.
+ * Called whenever a scheduled appointment frees up (admin cancels it, a
+ * customer cancels, a cancellation request is approved, a booking request is
+ * rejected). Waitlist members get their own notification (with a Notification
+ * row); on top of that EVERY other customer who turned push on gets the same
+ * message, since anyone might want the slot. `owner_user_id` is the customer
+ * whose appointment it was — they already know (they cancelled it, or were
+ * told the barber did), so they're skipped in both groups. Entries stay on
+ * the waitlist afterward (no auto-removal); the admin or the customer removes
+ * them explicitly.
  */
-export async function notifyWaitlistOfFreedSlot(starts_at: Date, service_name: string): Promise<void> {
-  await notifyAllWaitlistEntries(
-    `התפנה תור ל${service_name} בתאריך ${formatIsraelDate(starts_at)} בשעה ${formatIsraelTime(starts_at)} — מיהרו לקבוע!`,
+export async function notifyWaitlistOfFreedSlot(
+  starts_at: Date,
+  service_name: string,
+  owner_user_id?: string | null,
+): Promise<void> {
+  const message = `התפנה תור ל${service_name} בתאריך ${formatIsraelDate(starts_at)} בשעה ${formatIsraelTime(starts_at)} — מיהרו לקבוע!`;
+  const notifiedUserIds = await notifyAllWaitlistEntries(message, owner_user_id);
+  await sendPushToCustomers(
+    { title: "יש תור פנוי", body: message, url: "/account/book" },
+    { excludeUserIds: [...notifiedUserIds, ...(owner_user_id ? [owner_user_id] : [])] },
   );
 }
 

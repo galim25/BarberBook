@@ -74,7 +74,7 @@ async function decideBookingRequest(
   if (decision === "rejected") {
     await prisma.appointment.update({ where: { id: appointment.id }, data: { status: "cancelled" } });
     if (starts_at >= new Date()) {
-      await notifyWaitlistOfFreedSlot(starts_at, service.name);
+      await notifyWaitlistOfFreedSlot(starts_at, service.name, appointment.booked_by_user_id);
     }
   }
 

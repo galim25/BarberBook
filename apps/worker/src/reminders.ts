@@ -1,4 +1,4 @@
-import { prisma } from "@barberbook/db";
+import { prisma, sendPushToUser } from "@barberbook/db";
 import {
   APPOINTMENT_REMINDER_LEAD_MINUTES,
   formatIsraelDate,
@@ -12,7 +12,10 @@ import {
  * has no separate "reminder_sent" flag, so "no existing appointment_reminder
  * Notification for this appointment" is the only guard against duplicates.
  * Appointments with no linked account (booked_by_user_id null) have no
- * phone number to reach and are skipped.
+ * phone number to reach and are skipped. Delivery: the Notification row, a
+ * device push if the customer turned notifications on (needs the VAPID_* env
+ * vars in apps/worker/.env — same values as apps/web/.env), and SMS (a no-op
+ * until a real provider is configured).
  */
 export async function sendDueReminders(): Promise<void> {
   const now = new Date();
@@ -43,6 +46,13 @@ export async function sendDueReminders(): Promise<void> {
         status: "sent",
         sent_at: new Date(),
       },
+    });
+    // Creating the Notification row above is what marks this reminder as sent (idempotency), so the
+    // push is best-effort: sendPushToUser never throws and a customer with no subscribed device just gets no push.
+    await sendPushToUser(appointment.booked_by.id, {
+      title: "תזכורת לתור",
+      body: message,
+      url: "/account/appointments",
     });
   }
 }
