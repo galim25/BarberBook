@@ -22,7 +22,7 @@ export async function bookViaPhone(
 ): Promise<PhoneBookingResult> {
   const requiresApproval = await getRequiresApproval();
   try {
-    const booked = await bookAppointmentCore(input, actor, requiresApproval);
+    const booked = await bookAppointmentCore(input, actor, requiresApproval, true);
     if (requiresApproval) {
       await notifyAdminsOfBookingRequest(booked);
     } else {

@@ -26,6 +26,8 @@ test("fills the gaps around a break, a blocked time and an appointment in order"
         attendee_type: "self",
         service_name: "תספורת מבוגר",
         has_account: true,
+        booked_via_ivr: true,
+        phone_number: "0501234567",
       },
     ],
   );
@@ -61,6 +63,8 @@ test("an appointment touching the day start or end leaves no free segment there"
         attendee_type: "self",
         service_name: "חלאקה",
         has_account: false,
+        booked_via_ivr: false,
+        phone_number: null,
       },
     ],
   );

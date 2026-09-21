@@ -21,6 +21,9 @@ export type AdminAppointmentView = {
   starts_at: Date;
   ends_at: Date;
   has_account: boolean;
+  booked_via_ivr: boolean;
+  /** Only filled for phone-booked appointments (shown next to a call button) — null otherwise. */
+  phone_number: string | null;
 };
 
 async function requireAdminSession() {
@@ -33,7 +36,7 @@ export async function getAppointmentsForWorkDay(work_day_id: string): Promise<Ad
   if (!(await requireAdminSession())) return [];
   const appointments = await prisma.appointment.findMany({
     where: { work_day_id, status: "scheduled" },
-    include: { service: true },
+    include: { service: true, booked_by: { select: { phone_number: true } } },
     orderBy: { starts_at: "asc" },
   });
   return appointments.map((a) => ({
@@ -47,6 +50,8 @@ export async function getAppointmentsForWorkDay(work_day_id: string): Promise<Ad
     starts_at: a.starts_at,
     ends_at: a.ends_at,
     has_account: a.booked_by_user_id !== null,
+    booked_via_ivr: a.booked_via_ivr,
+    phone_number: a.booked_via_ivr ? (a.booked_by?.phone_number ?? null) : null,
   }));
 }
 

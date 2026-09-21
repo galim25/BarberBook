@@ -35,6 +35,8 @@ export async function bookAppointmentCore(
   input: CreateAppointmentInput,
   actor: BookingActor,
   requiresApproval: boolean,
+  /** True only for the phone IVR — recorded on the appointment so the barber can see how it was booked. */
+  viaIvr = false,
 ): Promise<BookedAppointment> {
   return runSerializable(async (tx) => {
     const service = await tx.service.findUniqueOrThrow({ where: { id: input.service_id } });
@@ -89,6 +91,7 @@ export async function bookAppointmentCore(
         starts_at,
         ends_at: new Date(starts_at.getTime() + service.duration_minutes * 60_000),
         status: "scheduled",
+        booked_via_ivr: viaIvr,
       },
     });
 

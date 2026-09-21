@@ -205,6 +205,8 @@ model Appointment {
   starts_at           DateTime
   ends_at             DateTime
   status              AppointmentStatus @default(scheduled)
+  /// True when the customer booked through the phone line (IVR) rather than the app — the barber sees this next to the appointment along with a call button.
+  booked_via_ivr      Boolean           @default(false)
   created_at          DateTime          @default(now())
   updated_at          DateTime          @updatedAt
 

@@ -85,8 +85,27 @@ export function QuickDayAppointments({
                 {s.attendee_type === "child" && ` (עבור: ${s.attendee_name})`}
                 {!s.has_account && " · תור ידני"}
               </p>
+              {s.booked_via_ivr && (
+                <p className="text-slate-muted truncate text-xs">
+                  נקבע בטלפון (IVR)
+                  {s.phone_number && (
+                    <>
+                      {" · "}
+                      <span dir="ltr">{s.phone_number}</span>
+                    </>
+                  )}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-3">
+              {s.booked_via_ivr && s.phone_number && (
+                <a
+                  href={`tel:${s.phone_number}`}
+                  className="border-barber-teal text-barber-teal rounded-full border px-3 py-1 text-xs font-medium"
+                >
+                  חיוג
+                </a>
+              )}
               {showMoveButton && (
                 <MoveAppointmentButton appointmentId={s.id} workDayId={workDayId} serviceId={s.service_id} />
               )}
