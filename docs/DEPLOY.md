@@ -58,8 +58,8 @@ cp .env.example .env
 COOKIE_SECURE="false"   # כמו בשרת הישן — בלי HTTPS העוגיה Secure תיזרק בשקט
 
 docker compose -f docker-compose.yml -f docker-compose.preview.yml up -d postgres web worker
-docker compose exec web pnpm db:migrate
-docker compose exec web pnpm db:seed
+docker compose exec web pnpm --filter @barberbook/db run migrate
+docker compose exec web pnpm --filter @barberbook/db run seed
 ```
 
 ואז לפתוח `http://<IP>:3000` בדפדפן. ודאו שפורט 3000 פתוח בפיירוול/בקבוצת
@@ -113,8 +113,8 @@ docker compose exec nginx nginx -s reload
 הימות מתחילים מאפס בשרת החדש.
 
 ```bash
-docker compose exec web pnpm db:migrate
-docker compose exec web pnpm db:seed
+docker compose exec web pnpm --filter @barberbook/db run migrate
+docker compose exec web pnpm --filter @barberbook/db run seed
 ```
 
 פלט ה-seed ידפיס את סיסמת האדמין החד-פעמית (אם לא נקבע `ADMIN_SEED_PASSWORD`
@@ -171,7 +171,9 @@ docker compose exec postgres pg_dump -U <POSTGRES_USER> <POSTGRES_DB> | gzip > b
 
 - **עדכון קוד:** `git pull && docker compose build && docker compose up -d`
 - **לוגים:** `docker compose logs -f web` / `worker` / `nginx`
-- **מיגרציה חדשה של סכימה:** `docker compose exec web pnpm db:migrate`
+- **מיגרציה חדשה של סכימה:** `docker compose exec web pnpm --filter @barberbook/db run migrate`
+  (לא `pnpm db:migrate` — תיקון 2026-09-22: תיקיית העבודה במיכל `web` היא `apps/web`, שאין
+  בו script כזה; ה-alias הזה קיים רק ב-`package.json` הראשי. אושר בפועל בפרודקשן.)
 
 ### הפעלת התראות Push למנהל (נוסף 2026-09-06)
 
@@ -193,7 +195,7 @@ npx web-push generate-vapid-keys
 git pull
 docker compose build web
 docker compose up -d web
-docker compose exec web pnpm db:migrate   # מוסיף את טבלת push_subscriptions
+docker compose exec web pnpm --filter @barberbook/db run migrate   # מוסיף את טבלת push_subscriptions
 ```
 
 לאחר מכן, בכניסה כמנהל אל `/admin/notifications`, יופיע כפתור "הפעלת
