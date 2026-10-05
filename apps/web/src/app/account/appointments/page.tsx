@@ -64,18 +64,23 @@ export default async function AppointmentsPage() {
             {a.attendee_type === "child" && (
               <p className="text-slate-muted text-sm">עבור: {a.attendee_name}</p>
             )}
-            {a.booking_request?.status === "pending" ? (
-              <p className="text-slate-muted mt-2 text-sm">התור ממתין לאישור הספר</p>
-            ) : a.cancellation_request?.status === "pending" ? (
+            {a.cancellation_request?.status === "pending" ? (
               <p className="text-slate-muted mt-2 text-sm">בקשת ביטול נשלחה — ממתינה לאישור הספר</p>
             ) : (
               <div className="mt-2 flex flex-col gap-2">
+                {a.booking_request?.status === "pending" && (
+                  <p className="text-slate-muted text-sm">התור ממתין לאישור הספר</p>
+                )}
                 <RescheduleButton
                   appointmentId={a.id}
                   serviceId={a.service.id}
                   barberId={a.work_day.barber_id}
                 />
-                <RequestCancellationButton appointmentId={a.id} requiresApproval={requiresApproval} />
+                {/* A not-yet-approved booking is withdrawn immediately, no barber approval needed. */}
+                <RequestCancellationButton
+                  appointmentId={a.id}
+                  requiresApproval={requiresApproval && a.booking_request?.status !== "pending"}
+                />
               </div>
             )}
           </li>

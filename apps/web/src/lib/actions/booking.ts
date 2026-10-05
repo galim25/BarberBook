@@ -211,7 +211,7 @@ export async function rescheduleAppointmentAction(input: RescheduleInput): Promi
     const moved = await runSerializable(async (tx) => {
       const appointment = await tx.appointment.findUniqueOrThrow({
         where: { id: input.appointment_id },
-        include: { service: true },
+        include: { service: true, booking_request: true },
       });
       if (appointment.booked_by_user_id !== session.sub) {
         throw new Error("FORBIDDEN");
@@ -266,6 +266,8 @@ export async function rescheduleAppointmentAction(input: RescheduleInput): Promi
         service_name: appointment.service.name,
         old_starts_at: appointment.starts_at,
         new_starts_at: starts_at,
+        // A pending booking request just follows the appointment to its new time — still for the barber to decide.
+        awaiting_approval: appointment.booking_request?.status === "pending",
       };
     });
 

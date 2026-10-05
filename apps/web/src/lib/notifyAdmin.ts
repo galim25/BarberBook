@@ -109,14 +109,16 @@ type CustomerRescheduleInfo = {
   customer_name: string;
   old_starts_at: Date;
   new_starts_at: Date;
+  /** The appointment still awaits the barber's approval — the request now stands for the new time. */
+  awaiting_approval?: boolean;
 };
 
 /** In-app + push — a customer moved their own appointment to another time. */
 export async function notifyAdminsOfCustomerReschedule(info: CustomerRescheduleInfo): Promise<void> {
   await notifyAdmins({
     type: "appointment_changed",
-    message: `תור הועבר ע"י הלקוח: ${info.service_name} של ${info.customer_name} מ-${formatIsraelDate(info.old_starts_at)} ${formatIsraelTime(info.old_starts_at)} ל-${formatIsraelDate(info.new_starts_at)} ${formatIsraelTime(info.new_starts_at)}.`,
-    push: { title: "תור הועבר", url: "/admin" },
+    message: `תור הועבר ע"י הלקוח: ${info.service_name} של ${info.customer_name} מ-${formatIsraelDate(info.old_starts_at)} ${formatIsraelTime(info.old_starts_at)} ל-${formatIsraelDate(info.new_starts_at)} ${formatIsraelTime(info.new_starts_at)}.${info.awaiting_approval ? " התור עדיין ממתין לאישורך." : ""}`,
+    push: { title: "תור הועבר", url: info.awaiting_approval ? "/admin/booking-requests" : "/admin" },
     appointment_id: info.appointment_id,
   });
 }

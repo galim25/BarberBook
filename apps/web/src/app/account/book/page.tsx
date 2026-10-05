@@ -18,7 +18,7 @@ import { getDayPeriods, type DayPeriod } from "@/lib/availability";
 import { BrandHero } from "@/components/BrandHero";
 import { BsdBar } from "@/components/BsdBar";
 
-type Step = "barber" | "date" | "service" | "period" | "slot" | "attendee" | "done";
+type Step = "barber" | "date" | "service" | "period" | "slot" | "attendee" | "summary" | "done";
 
 const WEEKDAY_LABELS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 const MONTH_LABELS = [
@@ -227,18 +227,16 @@ export default function BookAppointmentPage() {
     setStep("slot");
   }
 
-  async function chooseSlot(s: string) {
+  function chooseSlot(s: string) {
     setSlot(s);
     setError(undefined);
-    if (service?.is_child_service) {
-      setStep("attendee");
-      return;
-    }
-    await confirm(s);
+    // Nothing is booked yet — the customer reviews everything on the summary
+    // step and only "אישור" there actually creates the appointment.
+    setStep(service?.is_child_service ? "attendee" : "summary");
   }
 
-  async function confirm(slotOverride?: string) {
-    const starts_at = slotOverride ?? slot;
+  async function confirm() {
+    const starts_at = slot;
     if (!service || !date || !starts_at) return;
     setPending(true);
     setError(undefined);
@@ -268,7 +266,9 @@ export default function BookAppointmentPage() {
     setWaitlistJoined(true);
   }
 
+  /** Back to the very first step — after a booking ("קביעת תור נוסף") and from the summary's "ביטול". */
   function bookAnother() {
+    setError(undefined);
     setService(undefined);
     setDate(undefined);
     setPeriod(undefined);
@@ -489,14 +489,68 @@ export default function BookAppointmentPage() {
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button
             type="button"
-            onClick={() => confirm()}
-            disabled={pending || !attendeeName.trim()}
+            onClick={() => setStep("summary")}
+            disabled={!attendeeName.trim()}
             className="bg-barber-teal text-cream-text rounded-full py-3 text-center text-lg font-bold tracking-wide uppercase disabled:opacity-50"
           >
-            {pending ? "שומר..." : "אישור קביעת תור"}
+            המשך
           </button>
           <button type="button" onClick={() => setStep("slot")} className="text-barber-teal self-start text-sm font-medium">
             חזרה
+          </button>
+        </div>
+      )}
+
+      {step === "summary" && (
+        <div className="flex flex-col gap-4">
+          <p className="text-ink text-lg font-bold">סיכום התור</p>
+          <dl className="border-barber-teal flex flex-col gap-2 rounded-xl border bg-white p-4">
+            {barber && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-muted">ספר</dt>
+                <dd className="text-ink font-medium">{barber.full_name}</dd>
+              </div>
+            )}
+            <div className="flex justify-between gap-4">
+              <dt className="text-slate-muted">שירות</dt>
+              <dd className="text-ink font-medium">
+                {service?.name} ({service?.duration_minutes} דק&apos;)
+              </dd>
+            </div>
+            {service?.is_child_service && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-muted">עבור</dt>
+                <dd className="text-ink font-medium">{attendeeName}</dd>
+              </div>
+            )}
+            <div className="flex justify-between gap-4">
+              <dt className="text-slate-muted">תאריך</dt>
+              <dd className="text-ink font-medium">{date && formatDate(date.work_date)}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-slate-muted">שעה</dt>
+              <dd className="text-ink font-medium">{slot && formatTime(slot)}</dd>
+            </div>
+          </dl>
+          {requiresApproval && (
+            <p className="text-slate-muted text-sm">לאחר האישור, התור יישלח לאישור הספר.</p>
+          )}
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <button
+            type="button"
+            onClick={confirm}
+            disabled={pending}
+            className="bg-barber-teal text-cream-text rounded-full py-3 text-center text-lg font-bold tracking-wide uppercase disabled:opacity-50"
+          >
+            {pending ? "שומר..." : "אישור"}
+          </button>
+          <button
+            type="button"
+            onClick={bookAnother}
+            disabled={pending}
+            className="border-barber-teal text-barber-teal rounded-full border py-3 font-bold disabled:opacity-50"
+          >
+            ביטול
           </button>
         </div>
       )}

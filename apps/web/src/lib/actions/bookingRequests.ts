@@ -72,13 +72,19 @@ async function decideBookingRequest(
     where: { id: request_id },
     include: { appointment: { include: { service: true, booked_by: true } } },
   });
-  if (!request) return { error: "הבקשה לא נמצאה" };
+  if (!request) return { error: "הלקוח ביטל את הבקשה" };
   if (request.status !== "pending") return { error: "הבקשה כבר טופלה" };
 
-  await prisma.bookingRequest.update({
-    where: { id: request_id },
+  // Conditional on still-pending: the customer may withdraw (delete) the request in the meantime —
+  // see requestCancellationAction.
+  const { count } = await prisma.bookingRequest.updateMany({
+    where: { id: request_id, status: "pending" },
     data: { status: decision, reviewed_by_user_id: session.sub, reviewed_at: new Date() },
   });
+  if (count === 0) {
+    revalidatePath("/admin/booking-requests");
+    return { error: "הלקוח ביטל את הבקשה" };
+  }
 
   const { appointment } = request;
   const { service, starts_at } = appointment;

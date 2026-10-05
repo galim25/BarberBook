@@ -27,7 +27,10 @@ async function requireAdminSession() {
  *
  * When the switch is off, cancellation happens immediately instead — same
  * effect as the admin's own cancelAppointmentAction — with no
- * CancellationRequest involved at all.
+ * CancellationRequest involved at all. Same when the appointment itself is
+ * still awaiting the barber's approval (pending BookingRequest): there's
+ * nothing approved to protect yet, so the customer withdraws it outright and
+ * the request disappears from the barber's queue.
  */
 export async function requestCancellationAction(appointment_id: string): Promise<BookingResult> {
   const session = await getSession();
@@ -35,7 +38,7 @@ export async function requestCancellationAction(appointment_id: string): Promise
 
   const appointment = await prisma.appointment.findUnique({
     where: { id: appointment_id },
-    include: { cancellation_request: true, service: true },
+    include: { cancellation_request: true, booking_request: true, service: true },
   });
   if (!appointment || appointment.booked_by_user_id !== session.sub) {
     return { error: "אין הרשאה לבקש ביטול לתור זה" };
@@ -44,8 +47,23 @@ export async function requestCancellationAction(appointment_id: string): Promise
     return { error: "התור כבר אינו פעיל" };
   }
 
-  if (!(await getRequiresApproval())) {
-    await prisma.appointment.update({ where: { id: appointment_id }, data: { status: "cancelled" } });
+  // Withdrawing a not-yet-approved booking. deleteMany only matches while the request is still
+  // pending, so if the barber approved/rejected it a moment ago this falls through to the normal flow.
+  const withdrawn =
+    appointment.booking_request?.status === "pending" &&
+    (await prisma.$transaction(async (tx) => {
+      const { count } = await tx.bookingRequest.deleteMany({
+        where: { appointment_id, status: "pending" },
+      });
+      if (count === 0) return false;
+      await tx.appointment.update({ where: { id: appointment_id }, data: { status: "cancelled" } });
+      return true;
+    }));
+
+  if (withdrawn || !(await getRequiresApproval())) {
+    if (!withdrawn) {
+      await prisma.appointment.update({ where: { id: appointment_id }, data: { status: "cancelled" } });
+    }
     if (appointment.starts_at >= new Date()) {
       await notifyAdminsOfCustomerCancellation({
         appointment_id: appointment.id,
