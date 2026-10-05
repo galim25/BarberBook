@@ -55,3 +55,24 @@ export function buildDayTimeline(
 
   return timeline;
 }
+
+/**
+ * Splits every "free" segment into one free segment per bookable slot on the
+ * same grid the customer sees (`findAvailableSlots`): a step every
+ * `stepMinutes` from the segment's start, which is already re-anchored to the
+ * end of the previous busy block. A slot only counts if a full step fits
+ * before the segment ends — a leftover shorter than the shortest service
+ * can't be booked anyway. Used by the admin "ניהול היום" page, which lists
+ * the day slot by slot instead of as free ranges.
+ */
+export function splitFreeSegments(timeline: TimelineSegment[], stepMinutes = 10): TimelineSegment[] {
+  const step = stepMinutes * 60_000;
+  return timeline.flatMap((s): TimelineSegment[] => {
+    if (s.kind !== "free") return [s];
+    const slots: TimelineSegment[] = [];
+    for (let t = s.starts_at.getTime(); t + step <= s.ends_at.getTime(); t += step) {
+      slots.push({ kind: "free", starts_at: new Date(t), ends_at: new Date(t + step) });
+    }
+    return slots;
+  });
+}

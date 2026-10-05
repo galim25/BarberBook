@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildDayTimeline } from "./dayTimeline";
+import { buildDayTimeline, splitFreeSegments } from "./dayTimeline";
 
 const at = (h: number, m = 0) => new Date(`2026-08-01T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00Z`);
 
@@ -70,4 +70,49 @@ test("an appointment touching the day start or end leaves no free segment there"
   );
   assert.equal(timeline.length, 1);
   assert.equal(timeline[0].kind, "appointment");
+});
+
+test("splitFreeSegments lists free time as one row per 10-minute slot, re-anchored after a 15-minute appointment", () => {
+  const timeline = splitFreeSegments(
+    buildDayTimeline(
+      at(9),
+      at(10),
+      [{ starts_at: at(9, 45), ends_at: at(10) }],
+      [],
+      [
+        {
+          id: "a1",
+          service_id: "s1",
+          starts_at: at(9, 10),
+          ends_at: at(9, 25),
+          customer_name: "פלוני אלמוני",
+          attendee_name: "פלוני אלמוני",
+          attendee_type: "self",
+          service_name: "תספורת + זקן",
+          has_account: true,
+          booked_via_ivr: false,
+          phone_number: null,
+        },
+      ],
+    ),
+  );
+
+  assert.deepEqual(
+    timeline.map((s) => [s.kind, s.starts_at.getTime()]),
+    [
+      ["free", at(9).getTime()],
+      ["appointment", at(9, 10).getTime()],
+      ["free", at(9, 25).getTime()],
+      ["free", at(9, 35).getTime()],
+      ["break", at(9, 45).getTime()],
+    ],
+  );
+});
+
+test("splitFreeSegments drops a leftover shorter than one slot", () => {
+  const timeline = splitFreeSegments([{ kind: "free", starts_at: at(9), ends_at: at(9, 25) }]);
+  assert.deepEqual(
+    timeline.map((s) => s.starts_at.getTime()),
+    [at(9).getTime(), at(9, 10).getTime()],
+  );
 });

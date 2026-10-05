@@ -21,11 +21,14 @@ export function QuickDayAppointments({
   barberId,
   timeline,
   showMoveButton = false,
+  freeAsSlots = false,
 }: {
   workDayId: string;
   barberId: string;
   timeline: TimelineSegment[];
   showMoveButton?: boolean;
+  /** Free time is already split into single slots (see `splitFreeSegments`) — show each by its start time only. */
+  freeAsSlots?: boolean;
 }) {
   const [openSlotStartsAt, setOpenSlotStartsAt] = useState<string | null>(null);
 
@@ -49,7 +52,7 @@ export function QuickDayAppointments({
           return (
             <li key={i} className="flex items-center justify-between py-2 text-sm">
               <span className="text-ink font-bold">
-                {formatHHMM(s.starts_at)}–{formatHHMM(s.ends_at)} ·{" "}
+                {freeAsSlots ? formatHHMM(s.starts_at) : `${formatHHMM(s.starts_at)}–${formatHHMM(s.ends_at)}`} ·{" "}
                 <span className="text-red-600">פנוי</span>
               </span>
               <button

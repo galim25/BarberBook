@@ -4,7 +4,7 @@ import { ISRAEL_TIME_ZONE } from "@barberbook/shared";
 import { requireAdmin } from "@/lib/auth/session";
 import { getWorkDayDetail } from "@/lib/actions/workdays";
 import { getAppointmentsForWorkDay } from "@/lib/actions/adminAppointments";
-import { buildDayTimeline } from "@/lib/dayTimeline";
+import { buildDayTimeline, splitFreeSegments } from "@/lib/dayTimeline";
 import { EditHoursForm } from "./EditHoursForm";
 import { CreateManualAppointmentForm } from "./CreateManualAppointmentForm";
 import { DeleteWorkDayButton } from "./DeleteWorkDayButton";
@@ -39,12 +39,14 @@ export default async function AdminDayPage({ params }: { params: Promise<{ id: s
   if (!workDay) notFound();
 
   const appointments = await getAppointmentsForWorkDay(id);
-  const timeline = buildDayTimeline(
-    workDay.starts_at,
-    workDay.ends_at,
-    workDay.breaks,
-    workDay.blocked_times,
-    appointments,
+  const timeline = splitFreeSegments(
+    buildDayTimeline(
+      workDay.starts_at,
+      workDay.ends_at,
+      workDay.breaks,
+      workDay.blocked_times,
+      appointments,
+    ),
   );
 
   return (
@@ -81,6 +83,7 @@ export default async function AdminDayPage({ params }: { params: Promise<{ id: s
           barberId={workDay.barber_id}
           timeline={timeline}
           showMoveButton
+          freeAsSlots
         />
       </div>
 
