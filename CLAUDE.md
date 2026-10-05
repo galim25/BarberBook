@@ -26,6 +26,8 @@
 - **פתוח בנפרד:** איפוס סיסמה (`forgotPasswordAction`) עדיין לא שולח כלום כי `getSmsProvider()` הוא Noop — במצב `sms_code` הוא סגור ממילא; נשאר רלוונטי רק אם נשארים במצב סיסמה.
 - **נעשה היום ונדחף (2026-09-21/22):** Push ללקוחות + התראות מנהל (`ebcb908`), סימון תור שנקבע בטלפון + חיוג (`fece809`) — פירוט בסעיפי המצב למטה.
 
+**🔴 תוקן 2026-10-05 — Push לא עבד בכלל בפרודקשן (Docker), למרות שעבד בשרת הפיתוח.** הספר התקין את ה-PWA ואישר התראות בהגדרות אנדרואיד, ולא קיבל כלום; גם הלקוח לא קיבל התראה על ביטול תור. הסיבה אחת לשני התסמינים: `NEXT_PUBLIC_VAPID_PUBLIC_KEY` נטמע ע"י `next build` **בזמן build**, אבל ב-Docker הוא לא היה זמין אז — `env_file: .env` הוא runtime בלבד, ו-`.dockerignore` מוציא כל `.env` מה-build context. התוצאה: המפתח התקמפל כ-`undefined` → `<PushNotificationToggle/>` החזיר `null` → **כפתור "הפעלת התראות" לא הוצג כלל** → אין אף שורה ב-`PushSubscription` → `sendPushToAdmins`/`sendPushToUser` לא מצאו למי לשלוח ושתקו. הצד השרתי היה תקין כל הזמן. **התיקון:** `ARG`/`ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY` בשלב `build` ב-`Dockerfile` + `build.args` בשירות `web` ב-`docker-compose.yml`. **מסקנה כללית לכל `NEXT_PUBLIC_*` שיתווסף בעתיד: חייב `ARG` ב-`Dockerfile` + `build.args` ב-compose — `env_file` לא מספיק, ושינוי ערך מחייב `docker compose build` ולא רק `up -d`.** ראו את ההערה המלאה ב-`docs/DEPLOY.md`.
+
 ## Stack וארכיטקטורה
 
 ```

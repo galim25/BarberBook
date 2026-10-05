@@ -198,6 +198,20 @@ docker compose up -d web
 docker compose exec web pnpm --filter @barberbook/db run migrate   # מוסיף את טבלת push_subscriptions
 ```
 
+> **באג שתוקן 2026-10-05 — אם ההתראות לא הגיעו בפרודקשן, זו הסיבה.**
+> `NEXT_PUBLIC_VAPID_PUBLIC_KEY` נטמע בבנדל הלקוח **בזמן `next build`**, לא נקרא
+> מהסביבה בזמן ריצה. `env_file: .env` ב-`docker-compose.yml` מגיע רק לקונטיינר
+> **הרץ**, ו-`.dockerignore` מוציא כל `.env` מה-build context — כך שהצבת המפתח
+> ב-`.env` לבדה **לא הספיקה**: הוא התקמפל כ-`undefined`, `<PushNotificationToggle/>`
+> החזיר `null`, כפתור "הפעלת התראות" לא הוצג כלל, אף אחד לא נרשם, וכל ההתראות
+> נבלעו בשקט (`sendPushToAdmins`/`sendPushToUser` הן no-op כשאין מנויים). בשרת
+> הפיתוח (pm2, `pnpm build` מתוך `apps/web` עם `apps/web/.env` נוכח) זה דווקא
+> עבד — ומכאן הפער בין "נבדק ועובד" ל"לא עובד בפרודקשן".
+> התיקון: `ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY` ב-`Dockerfile` (שלב `build`) +
+> `build.args` בשירות `web` ב-`docker-compose.yml`, שמעביר אותו מה-`.env` בשורש.
+> **המשמעות המעשית: כל שינוי של המפתח מחייב `docker compose build web` מחדש —
+> `docker compose up -d` לבדו לא יעדכן אותו.**
+
 לאחר מכן, בכניסה כמנהל אל `/admin/notifications`, יופיע כפתור "הפעלת
 התראות" — לחיצה עליו (בכל מכשיר שרוצים לקבל בו התראות, בנפרד) מבקשת הרשאה
 מהדפדפן. **חשוב לאייפון:** Apple מאפשרת Web Push רק לאפליקציה שהותקנה

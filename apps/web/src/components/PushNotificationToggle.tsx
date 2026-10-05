@@ -29,7 +29,18 @@ export function PushNotificationToggle({ audience }: { audience: "admin" | "cust
 
   useEffect(() => {
     async function check() {
-      if (!VAPID_PUBLIC_KEY || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      if (!VAPID_PUBLIC_KEY) {
+        // Server-side misconfiguration, not a browser limitation: the key is
+        // inlined at build time, so a Docker image built without the
+        // NEXT_PUBLIC_VAPID_PUBLIC_KEY build arg lands here and the whole
+        // toggle disappears — which looks exactly like "the device doesn't
+        // support notifications". Say so out loud so it's diagnosable from
+        // the browser console instead of being invisible.
+        console.warn("[push] NEXT_PUBLIC_VAPID_PUBLIC_KEY missing from this build — notifications cannot be enabled.");
+        setStatus("unsupported");
+        return;
+      }
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
         setStatus("unsupported");
         return;
       }

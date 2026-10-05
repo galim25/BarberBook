@@ -23,6 +23,11 @@ services:
       context: .
       dockerfile: Dockerfile
       target: web
+      args:
+        # Build-time, not runtime: next build inlines NEXT_PUBLIC_* into the
+        # client bundle, so env_file below is too late for it. Compose
+        # interpolates this from the root .env. See the ARG in Dockerfile.
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
     restart: unless-stopped
     env_file: .env
     depends_on:

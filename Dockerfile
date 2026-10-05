@@ -29,6 +29,19 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS build
 COPY . .
 RUN pnpm db:generate
+
+# NEXT_PUBLIC_* values are inlined into the client bundle by `next build` — they
+# are NOT read from the container's environment at runtime. `env_file: .env` in
+# docker-compose.yml only reaches the *running* container, and .dockerignore
+# keeps every .env out of the build context on purpose, so without this ARG the
+# key compiles to `undefined`, PushNotificationToggle renders nothing, nobody can
+# ever subscribe, and every push is silently dropped. docker-compose.yml passes
+# it through from the root .env (see `build.args` on the web service).
+ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY=""
+ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
+RUN if [ -z "$NEXT_PUBLIC_VAPID_PUBLIC_KEY" ]; then \
+      echo "WARNING: NEXT_PUBLIC_VAPID_PUBLIC_KEY is empty — push notifications will be unavailable in this image (the enable-notifications button will not render). Set it in .env and rebuild."; \
+    fi
 RUN pnpm --filter @barberbook/web build
 
 # --- web: next start ---
