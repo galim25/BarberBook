@@ -33,7 +33,7 @@ const MAX_NAME_ATTEMPTS = 2;
  * which is why the greeting was reported as sounding bad. Every other
  * "תוֹר"/"תוֹרִים" in this file was already fixed; this one just missed it.
  */
-const WELCOME_GREETING = "הִגַעְתֶם לְמַעֲרֶכֶת קְבִיעַת הַתוֹרִים שֶׁל מִסְפָּרַת יוֹסִי. ";
+const WELCOME_GREETING = "הִגַעְתֶם לְמַעֲרֶכֶת קְבִיעַת הַתוֹרִים שֶׁל מָספֶּרָת יוֹסִי. ";
 
 /**
  * 2026-08-08: was hand-built as "{weekday} {day}/{month}" (e.g. "יום ראשון
@@ -77,10 +77,10 @@ export async function startCall(apiCallId: string, apiPhone: string | null): Pro
   const identity = await identifyCaller(apiPhone);
 
   if (identity.outcome === "no_caller_id") {
-    return sayAndHangup([WELCOME_GREETING, "לא ניתן לזהות את מספרך. השתמשו באפליקציה או בקו הרגיל של המספרה."]);
+    return sayAndHangup([WELCOME_GREETING, "לא ניתן לזהות את מספרך. השתמשו באפליקציה או בקו הרגיל של הַמָסְפֵרָה."]);
   }
   if (identity.outcome === "blocked") {
-    return sayAndHangup([WELCOME_GREETING, "לא ניתן לקבוע תור בקו זה. אנא צרו קשר עם המספרה."]);
+    return sayAndHangup([WELCOME_GREETING, "לא ניתן לקבוע תור בקו זה. אנא צרו קשר עם הַמָסְפֵרָה."]);
   }
 
   if (identity.outcome === "existing_user") {
@@ -212,7 +212,7 @@ async function handleRegisterConfirm(apiCallId: string, state: CallState, digits
 
     if (result.outcome === "blocked") {
       clearCallState(apiCallId);
-      return sayAndHangup("לא ניתן לקבוע תור בקו זה. אנא צרו קשר עם המספרה.");
+      return sayAndHangup("לא ניתן לקבוע תור בקו זה. אנא צרו קשר עם הַמָסְפֵרָה.");
     }
 
     let user_id: string;
@@ -558,7 +558,7 @@ async function finalizeBooking(
   const confirmText = result.pendingApproval
     ? "הַתוֹר שֶׁלְךָ נִשְׁמַר ומַמְתִין לְאִישׁור הַסַפָר, תִשָׁלַח הוֹדָעָה כְשֶׁהוא יְאַשֵׁר."
     : `מעולה, הַתוֹר נִקְבַע לְ${weekdayDate(d)} בְשָׁעָה ${speakTime(d)}.`;
-  const bookMoreMenu = "לִקְבִיעַת תוֹר נוֹסָף בְאוֹתָה שִׂיחָה הַקֵשׁ 1, לְסִיום הַקֵשׁ 2.";
+  const bookMoreMenu = "לִקְבִיעַת תוֹר נוֹסָף בְאוֹתָה שִׂיחָה הַקֵשׁ 1, לְסִיוּם הַקֵשׁ 2.";
 
   state.step = "book_more";
   setCallState(apiCallId, state);
