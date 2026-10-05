@@ -6,6 +6,7 @@ import type { TimelineSegment } from "@/lib/dayTimeline";
 import { CancelAppointmentButton } from "./day/[id]/CancelAppointmentButton";
 import { CreateManualAppointmentForm } from "./day/[id]/CreateManualAppointmentForm";
 import { MoveAppointmentButton } from "./day/[id]/MoveAppointmentButton";
+import { CustomerContact } from "@/components/CustomerContact";
 
 function formatHHMM(d: Date) {
   return d.toLocaleTimeString("en-GB", {
@@ -80,36 +81,20 @@ export function QuickDayAppointments({
             key={s.id}
             className="border-barber-teal/20 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b py-3 text-sm last:border-b-0"
           >
-            <div className="min-w-0">
-              <p className="text-ink truncate font-bold">
-                {formatHHMM(s.starts_at)} · {s.customer_name}
-              </p>
+            <CustomerContact
+              phone={s.phone_number}
+              registeredName={s.customer_name}
+              contactName={s.contact_name}
+              prefix={`${formatHHMM(s.starts_at)} · `}
+            >
               <p className="text-slate-muted truncate text-xs">
                 {s.service_name}
                 {s.attendee_type === "child" && ` (עבור: ${s.attendee_name})`}
                 {!s.has_account && " · תור ידני"}
+                {s.booked_via_ivr && " · נקבע בטלפון (IVR)"}
               </p>
-              {s.booked_via_ivr && (
-                <p className="text-slate-muted truncate text-xs">
-                  נקבע בטלפון (IVR)
-                  {s.phone_number && (
-                    <>
-                      {" · "}
-                      <span dir="ltr">{s.phone_number}</span>
-                    </>
-                  )}
-                </p>
-              )}
-            </div>
+            </CustomerContact>
             <div className="flex items-center gap-3">
-              {s.booked_via_ivr && s.phone_number && (
-                <a
-                  href={`tel:${s.phone_number}`}
-                  className="border-barber-teal text-barber-teal rounded-full border px-3 py-1 text-xs font-medium"
-                >
-                  חיוג
-                </a>
-              )}
               {showMoveButton && (
                 <MoveAppointmentButton appointmentId={s.id} workDayId={workDayId} serviceId={s.service_id} />
               )}

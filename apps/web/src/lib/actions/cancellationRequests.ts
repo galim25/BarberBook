@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@barberbook/db";
 import { formatIsraelDate, formatIsraelTime } from "@barberbook/shared";
 import { getSession } from "@/lib/auth/session";
+import { getContactNameMap } from "@/lib/contactNames";
 import { sendCustomerNotification } from "@/lib/notifyCustomer";
 import { notifyWaitlistOfFreedSlot } from "@/lib/actions/waitlist";
 import { notifyAdminsOfCancellationRequest, notifyAdminsOfCustomerCancellation } from "@/lib/notifyAdmin";
@@ -87,6 +88,8 @@ export type PendingCancellationRequest = {
   id: string;
   appointment_id: string;
   customer_name: string;
+  phone_number: string;
+  contact_name: string | null;
   service_name: string;
   barber_name: string;
   starts_at: Date;
@@ -99,13 +102,17 @@ export async function getPendingCancellationRequests(): Promise<PendingCancellat
     where: { status: "pending" },
     include: {
       appointment: { include: { service: true, work_day: { include: { barber: true } } } },
+      requested_by: { select: { phone_number: true } },
     },
     orderBy: { requested_at: "asc" },
   });
+  const contactNames = await getContactNameMap(requests.map((r) => r.requested_by.phone_number));
   return requests.map((r) => ({
     id: r.id,
     appointment_id: r.appointment_id,
     customer_name: r.appointment.customer_name,
+    phone_number: r.requested_by.phone_number,
+    contact_name: contactNames.get(r.requested_by.phone_number) ?? null,
     service_name: r.appointment.service.name,
     barber_name: r.appointment.work_day.barber.full_name,
     starts_at: r.appointment.starts_at,

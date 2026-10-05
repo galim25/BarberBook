@@ -50,6 +50,12 @@ enum NotificationType {
   customer_registered
 }
 
+enum ContactNameSource {
+  import
+  picker
+  manual
+}
+
 enum NotificationStatus {
   pending
   sent
@@ -344,6 +350,20 @@ model WaitlistEntry {
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("waitlist_entries")
+}
+
+/// The barber's own name for a phone number, as saved in their phone's contacts (imported from a
+/// .vcf export, picked via the Android Contact Picker, or typed by hand). Shown only to the admin, in
+/// place of the name the customer registered with. Keyed by phone number rather than User so it
+/// also covers numbers that aren't customers yet (picked contacts) and survives account changes.
+/// A re-import never overwrites a `manual` row — an explicit in-app edit wins over the phone's copy.
+model ContactName {
+  phone_number String            @id
+  display_name String
+  source       ContactNameSource
+  updated_at   DateTime          @updatedAt
+
+  @@map("contact_names")
 }
 
 model Announcement {

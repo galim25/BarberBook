@@ -69,6 +69,7 @@ export default async function AdminPage({
       <div className="flex items-center justify-between">
         <AdminMenu
           items={[
+            { href: "/admin/contacts", label: "אנשי קשר" },
             { href: "/admin/blocked-customers", label: "לקוחות חסומים" },
             { href: "/admin/waitlist", label: "רשימת המתנה" },
             { href: "/admin/announcements", label: "הודעות כלליות" },

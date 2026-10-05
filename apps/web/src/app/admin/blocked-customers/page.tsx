@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth/session";
 import { getBlockedPhoneNumbers } from "@/lib/actions/blocklist";
 import { BlockPhoneNumberForm } from "./BlockPhoneNumberForm";
 import { UnblockButton } from "./UnblockButton";
+import { CustomerContact } from "@/components/CustomerContact";
 import { PageHeader } from "@/components/PageHeader";
 import { AdminBrandHero } from "@/components/AdminBrandHero";
 
@@ -31,9 +32,10 @@ export default async function BlockedCustomersPage() {
         <ul className="flex flex-col gap-2">
           {blocked.map((b) => (
             <li key={b.id} className="border-barber-teal bg-white rounded-xl border p-3 text-sm">
-              <p className="text-ink font-bold">{b.phone_number}</p>
-              {b.reason && <p className="text-slate-muted">{b.reason}</p>}
-              <p className="text-slate-muted">נחסם ב-{formatDate(b.created_at)}</p>
+              <CustomerContact phone={b.phone_number} registeredName={b.registered_name} contactName={b.contact_name}>
+                {b.reason && <p className="text-slate-muted">{b.reason}</p>}
+                <p className="text-slate-muted">נחסם ב-{formatDate(b.created_at)}</p>
+              </CustomerContact>
               <div className="mt-1">
                 <UnblockButton id={b.id} />
               </div>

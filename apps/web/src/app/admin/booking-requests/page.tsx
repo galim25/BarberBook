@@ -3,6 +3,7 @@ import { ISRAEL_TIME_ZONE } from "@barberbook/shared";
 import { requireAdmin } from "@/lib/auth/session";
 import { getPendingBookingRequests } from "@/lib/actions/bookingRequests";
 import { DecideBookingRequestButtons } from "./DecideBookingRequestButtons";
+import { CustomerContact } from "@/components/CustomerContact";
 import { PageHeader } from "@/components/PageHeader";
 import { AdminBrandHero } from "@/components/AdminBrandHero";
 
@@ -35,12 +36,12 @@ export default async function BookingRequestsPage() {
       <ul className="flex flex-col gap-3">
         {requests.map((r) => (
           <li key={r.id} className="border-barber-teal bg-white rounded-xl border p-3 text-sm">
-            <p className="text-ink font-bold">
-              {r.customer_name} · {r.service_name}
-            </p>
-            <p className="text-slate-muted">אצל {r.barber_name}</p>
-            <p className="text-slate-muted">{formatDateTime(r.starts_at)}</p>
-            <p className="text-slate-muted">הבקשה נשלחה: {formatDateTime(r.requested_at)}</p>
+            <CustomerContact phone={r.phone_number} registeredName={r.customer_name} contactName={r.contact_name}>
+              <p className="text-ink">{r.service_name}</p>
+              <p className="text-slate-muted">אצל {r.barber_name}</p>
+              <p className="text-slate-muted">{formatDateTime(r.starts_at)}</p>
+              <p className="text-slate-muted">הבקשה נשלחה: {formatDateTime(r.requested_at)}</p>
+            </CustomerContact>
             <div className="mt-2">
               <DecideBookingRequestButtons requestId={r.id} />
             </div>

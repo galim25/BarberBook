@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma, sendPushToCustomers } from "@barberbook/db";
 import { formatIsraelDate, formatIsraelTime } from "@barberbook/shared";
 import { getSession } from "@/lib/auth/session";
+import { getContactNameMap } from "@/lib/contactNames";
 import { sendCustomerNotification } from "@/lib/notifyCustomer";
 import type { BookingResult } from "@/lib/actions/booking";
 
@@ -64,16 +65,19 @@ export type WaitlistEntryView = {
   id: string;
   customer_name: string;
   phone_number: string;
+  contact_name: string | null;
   created_at: Date;
 };
 
 export async function getWaitlistEntries(): Promise<WaitlistEntryView[]> {
   if (!(await requireAdminSession())) return [];
   const entries = await prisma.waitlistEntry.findMany({ orderBy: { created_at: "asc" } });
+  const contactNames = await getContactNameMap(entries.map((e) => e.phone_number));
   return entries.map((e) => ({
     id: e.id,
     customer_name: e.customer_name,
     phone_number: e.phone_number,
+    contact_name: contactNames.get(e.phone_number) ?? null,
     created_at: e.created_at,
   }));
 }

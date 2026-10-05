@@ -8,6 +8,7 @@ import { isSlotAvailable, type Interval } from "@/lib/availability";
 import { runSerializable } from "@/lib/serializableTransaction";
 import { notifyAppointmentCancelled, sendCustomerNotification } from "@/lib/notifyCustomer";
 import { notifyWaitlistOfFreedSlot } from "@/lib/actions/waitlist";
+import { getContactNameMap } from "@/lib/contactNames";
 import type { BookingResult } from "@/lib/actions/booking";
 
 export type AdminAppointmentView = {
@@ -22,8 +23,10 @@ export type AdminAppointmentView = {
   ends_at: Date;
   has_account: boolean;
   booked_via_ivr: boolean;
-  /** Only filled for phone-booked appointments (shown next to a call button) — null otherwise. */
+  /** The booking customer's number — null for a manual appointment with no linked account. */
   phone_number: string | null;
+  /** The barber's own name for that number (ContactName), shown instead of customer_name. */
+  contact_name: string | null;
 };
 
 async function requireAdminSession() {
@@ -39,6 +42,7 @@ export async function getAppointmentsForWorkDay(work_day_id: string): Promise<Ad
     include: { service: true, booked_by: { select: { phone_number: true } } },
     orderBy: { starts_at: "asc" },
   });
+  const contactNames = await getContactNameMap(appointments.map((a) => a.booked_by?.phone_number));
   return appointments.map((a) => ({
     id: a.id,
     service_id: a.service_id,
@@ -51,7 +55,8 @@ export async function getAppointmentsForWorkDay(work_day_id: string): Promise<Ad
     ends_at: a.ends_at,
     has_account: a.booked_by_user_id !== null,
     booked_via_ivr: a.booked_via_ivr,
-    phone_number: a.booked_via_ivr ? (a.booked_by?.phone_number ?? null) : null,
+    phone_number: a.booked_by?.phone_number ?? null,
+    contact_name: (a.booked_by && contactNames.get(a.booked_by.phone_number)) ?? null,
   }));
 }
 

@@ -43,10 +43,12 @@ export function ExportWorkDayList({ days }: { days: ExportWorkDay[] }) {
                     </td>
                     <td className="p-1">{a.service_name}</td>
                     <td className="p-1">
-                      {a.customer_name}
+                      {a.contact_name ?? a.customer_name}
                       {a.attendee_type === "child" && ` (עבור: ${a.attendee_name})`}
                     </td>
-                    <td className="p-1">{a.phone_number ?? "—"}</td>
+                    <td className="p-1 text-right" dir="ltr">
+                      {a.phone_number ?? "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

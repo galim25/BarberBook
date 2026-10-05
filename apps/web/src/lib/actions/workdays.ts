@@ -6,6 +6,7 @@ import { ISRAEL_TIME_ZONE, zonedTimeToUtc } from "@barberbook/shared";
 import { getSession } from "@/lib/auth/session";
 import { notifyAppointmentCancelled } from "@/lib/notifyCustomer";
 import { notifyWaitlistOfExtendedHours, notifyWaitlistOfNewWorkDay } from "@/lib/actions/waitlist";
+import { getContactNameMap } from "@/lib/contactNames";
 
 export type WorkDayBreak = { id: string; starts_at: Date; ends_at: Date };
 export type WorkDayWithBreaks = {
@@ -138,6 +139,7 @@ export type ExportAppointment = {
   attendee_name: string;
   attendee_type: string;
   phone_number: string | null;
+  contact_name: string | null;
   starts_at: Date;
   ends_at: Date;
 };
@@ -161,6 +163,7 @@ async function loadExportWorkDays(where: Prisma.WorkDayWhereInput): Promise<Expo
       },
     },
   });
+  const contactNames = await getContactNameMap(days.flatMap((d) => d.appointments.map((a) => a.booked_by?.phone_number)));
   return days.map((d) => ({
     id: d.id,
     work_date: d.work_date,
@@ -173,6 +176,7 @@ async function loadExportWorkDays(where: Prisma.WorkDayWhereInput): Promise<Expo
       attendee_name: a.attendee_name,
       attendee_type: a.attendee_type,
       phone_number: a.booked_by?.phone_number ?? null,
+      contact_name: (a.booked_by && contactNames.get(a.booked_by.phone_number)) ?? null,
       starts_at: a.starts_at,
       ends_at: a.ends_at,
     })),

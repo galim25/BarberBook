@@ -3,6 +3,7 @@ import { ISRAEL_TIME_ZONE } from "@barberbook/shared";
 import { requireAdmin } from "@/lib/auth/session";
 import { getWaitlistEntries } from "@/lib/actions/waitlist";
 import { RemoveWaitlistEntryButton } from "./RemoveWaitlistEntryButton";
+import { CustomerContact } from "@/components/CustomerContact";
 import { PageHeader } from "@/components/PageHeader";
 import { AdminBrandHero } from "@/components/AdminBrandHero";
 
@@ -33,9 +34,9 @@ export default async function WaitlistPage() {
         <ul className="flex flex-col gap-2">
           {entries.map((e) => (
             <li key={e.id} className="border-barber-teal bg-white rounded-xl border p-3 text-sm">
-              <p className="text-ink font-bold">{e.customer_name}</p>
-              <p className="text-slate-muted">{e.phone_number}</p>
-              <p className="text-slate-muted">נרשם/ה ב-{formatDate(e.created_at)}</p>
+              <CustomerContact phone={e.phone_number} registeredName={e.customer_name} contactName={e.contact_name}>
+                <p className="text-slate-muted">נרשם/ה ב-{formatDate(e.created_at)}</p>
+              </CustomerContact>
               <div className="mt-1">
                 <RemoveWaitlistEntryButton id={e.id} />
               </div>

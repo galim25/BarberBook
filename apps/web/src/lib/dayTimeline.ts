@@ -10,6 +10,7 @@ export type AppointmentBlock = Interval & {
   has_account: boolean;
   booked_via_ivr: boolean;
   phone_number: string | null;
+  contact_name?: string | null;
 };
 
 export type TimelineSegment =

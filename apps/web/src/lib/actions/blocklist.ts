@@ -4,12 +4,16 @@ import { revalidatePath } from "next/cache";
 import { prisma, Prisma } from "@barberbook/db";
 import { PHONE_NUMBER_REGEX } from "@barberbook/shared";
 import { getSession } from "@/lib/auth/session";
+import { getContactNameMap } from "@/lib/contactNames";
 
 export type BlockedPhoneNumberView = {
   id: string;
   phone_number: string;
   reason: string | null;
   created_at: Date;
+  /** Name of the customer account with this number, if any — a blocked number may never have registered. */
+  registered_name: string | null;
+  contact_name: string | null;
 };
 export type BlocklistResult = { error?: string; success?: boolean };
 
@@ -21,10 +25,21 @@ async function requireAdminSession() {
 
 export async function getBlockedPhoneNumbers(): Promise<BlockedPhoneNumberView[]> {
   if (!(await requireAdminSession())) return [];
-  return prisma.blockedPhoneNumber.findMany({
+  const blocked = await prisma.blockedPhoneNumber.findMany({
     orderBy: { created_at: "desc" },
     select: { id: true, phone_number: true, reason: true, created_at: true },
   });
+  const phones = blocked.map((b) => b.phone_number);
+  const [users, contactNames] = await Promise.all([
+    prisma.user.findMany({ where: { phone_number: { in: phones } }, select: { phone_number: true, full_name: true } }),
+    getContactNameMap(phones),
+  ]);
+  const registered = new Map(users.map((u) => [u.phone_number, u.full_name]));
+  return blocked.map((b) => ({
+    ...b,
+    registered_name: registered.get(b.phone_number) ?? null,
+    contact_name: contactNames.get(b.phone_number) ?? null,
+  }));
 }
 
 export async function blockPhoneNumberAction(input: {
