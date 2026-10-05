@@ -33,7 +33,9 @@ export async function getServices(barber_id: string): Promise<ServiceOption[]> {
     select: { is_primary: true },
   });
   return prisma.service.findMany({
-    where: barber.is_primary ? {} : { name: { in: [...SUB_BARBER_SERVICE_NAMES] } },
+    where: barber.is_primary
+      ? { is_manual_only: false }
+      : { is_manual_only: false, name: { in: [...SUB_BARBER_SERVICE_NAMES] } },
     orderBy: { name: "asc" },
     select: { id: true, name: true, duration_minutes: true, is_child_service: true },
   });
@@ -84,12 +86,21 @@ export async function getSlotsForDate(
   excludeAppointmentId?: string,
 ): Promise<string[]> {
   const service = await prisma.service.findUniqueOrThrow({ where: { id: service_id } });
+  return getSlotsForDuration(work_day_id, service.duration_minutes, excludeAppointmentId);
+}
+
+/** Same as getSlotsForDate, for a raw duration — the barber's manual-appointment form picks a duration, not a service. */
+export async function getSlotsForDuration(
+  work_day_id: string,
+  duration_minutes: number,
+  excludeAppointmentId?: string,
+): Promise<string[]> {
   const { work_day, busy } = await loadBusyIntervals(work_day_id, excludeAppointmentId);
   const now = new Date();
   return findAvailableSlots({
     work_day,
     busy,
-    duration_minutes: service.duration_minutes,
+    duration_minutes,
   })
     .filter((d) => d >= now)
     .map((d) => d.toISOString());

@@ -74,13 +74,12 @@ export default async function AdminDayPage({ params }: { params: Promise<{ id: s
         initialEndsAt={formatHHMM(workDay.ends_at)}
       />
 
-      <CreateManualAppointmentForm workDayId={workDay.id} barberId={workDay.barber_id} />
+      <CreateManualAppointmentForm workDayId={workDay.id} />
 
       <div className="border-barber-teal bg-white flex flex-col gap-3 rounded-xl border p-4">
         <h2 className="text-ink font-bold">לוח היום ({appointments.length} תורים)</h2>
         <QuickDayAppointments
           workDayId={workDay.id}
-          barberId={workDay.barber_id}
           timeline={timeline}
           showMoveButton
           freeAsSlots

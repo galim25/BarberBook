@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma, Prisma } from "@barberbook/db";
-import { formatIsraelDate, formatIsraelTime, isServiceAllowedForBarber } from "@barberbook/shared";
+import { formatIsraelDate, formatIsraelTime, MANUAL_APPOINTMENT_DURATIONS } from "@barberbook/shared";
 import { getSession } from "@/lib/auth/session";
 import { isSlotAvailable, type Interval } from "@/lib/availability";
 import { runSerializable } from "@/lib/serializableTransaction";
@@ -203,18 +203,18 @@ export async function cancelAppointmentAction(appointment_id: string): Promise<B
 
 type CreateManualAppointmentInput = {
   work_day_id: string;
-  service_id: string;
+  /** One of MANUAL_APPOINTMENT_DURATIONS. */
+  duration_minutes: number;
   starts_at: string;
   customer_name: string;
-  /** Required when the chosen service is a child service; ignored otherwise. */
-  attendee_name?: string;
 };
 
 /**
  * FR-13/US-011: the barber records an appointment for a customer who called
  * or walked in without using the app — no account, no phone number, just a
- * name. Same self/child semantics as the customer-facing booking flow, and
- * the same conflict checking, just with booked_by_user_id left null.
+ * name and how long to block (no service choice). The duration maps to one of
+ * the hidden is_manual_only services; same conflict checking as the
+ * customer-facing booking flow, just with booked_by_user_id left null.
  */
 export async function createManualAppointmentAction(
   input: CreateManualAppointmentInput,
@@ -223,22 +223,23 @@ export async function createManualAppointmentAction(
 
   const customer_name = input.customer_name.trim();
   if (!customer_name) return { error: "יש להזין שם לקוח" };
+  if (!(MANUAL_APPOINTMENT_DURATIONS as readonly number[]).includes(input.duration_minutes)) {
+    return { error: "יש לבחור משך זמן" };
+  }
 
   try {
     await runSerializable(async (tx) => {
-      const service = await tx.service.findUniqueOrThrow({ where: { id: input.service_id } });
+      const service = await tx.service.findFirstOrThrow({
+        where: { is_manual_only: true, duration_minutes: input.duration_minutes },
+      });
       const workDay = await tx.workDay.findUniqueOrThrow({
         where: { id: input.work_day_id },
         include: {
-          barber: { select: { is_primary: true } },
           breaks: true,
           blocked_times: true,
           appointments: { where: { status: "scheduled" } },
         },
       });
-      if (!isServiceAllowedForBarber(workDay.barber.is_primary, service.name)) {
-        throw new Error("SERVICE_NOT_OFFERED");
-      }
       const busy: Interval[] = [
         ...workDay.breaks.map((b) => ({ starts_at: b.starts_at, ends_at: b.ends_at })),
         ...workDay.blocked_times.map((b) => ({ starts_at: b.starts_at, ends_at: b.ends_at })),
@@ -254,19 +255,14 @@ export async function createManualAppointmentAction(
       );
       if (!ok) throw new Error("SLOT_TAKEN");
 
-      const attendee_name = input.attendee_name?.trim();
-      if (service.is_child_service && !attendee_name) {
-        throw new Error("ATTENDEE_NAME_REQUIRED");
-      }
-
       await tx.appointment.create({
         data: {
           work_day_id: input.work_day_id,
-          service_id: input.service_id,
+          service_id: service.id,
           booked_by_user_id: null,
           customer_name,
-          attendee_name: service.is_child_service ? attendee_name! : customer_name,
-          attendee_type: service.is_child_service ? "child" : "self",
+          attendee_name: customer_name,
+          attendee_type: "self",
           starts_at,
           ends_at: new Date(starts_at.getTime() + service.duration_minutes * 60_000),
           status: "scheduled",
@@ -276,12 +272,6 @@ export async function createManualAppointmentAction(
   } catch (err) {
     if (err instanceof Error && err.message === "SLOT_TAKEN") {
       return { error: "השעה כבר תפוסה — יש לבחור שעה אחרת" };
-    }
-    if (err instanceof Error && err.message === "ATTENDEE_NAME_REQUIRED") {
-      return { error: "יש להזין את שם הילד/ה" };
-    }
-    if (err instanceof Error && err.message === "SERVICE_NOT_OFFERED") {
-      return { error: "השירות הזה לא זמין אצל הספר הזה" };
     }
     return { error: "לא ניתן היה לשמור את התור, נסה/י שוב" };
   }

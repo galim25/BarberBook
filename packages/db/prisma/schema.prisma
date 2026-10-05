@@ -117,6 +117,8 @@ model Service {
   name              String   @unique
   duration_minutes  Int
   is_child_service  Boolean  @default(false)
+  /// Hidden "manual appointment" durations (see MANUAL_SERVICE_DEFINITIONS) — admin-only, never listed to customers/IVR.
+  is_manual_only    Boolean  @default(false)
   created_at        DateTime @default(now())
   updated_at        DateTime @updatedAt
 

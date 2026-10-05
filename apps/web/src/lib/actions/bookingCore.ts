@@ -52,7 +52,7 @@ export async function bookAppointmentCore(
     if (workDay.is_blocked) {
       throw new Error("DAY_BLOCKED");
     }
-    if (!isServiceAllowedForBarber(workDay.barber.is_primary, service.name)) {
+    if (service.is_manual_only || !isServiceAllowedForBarber(workDay.barber.is_primary, service.name)) {
       throw new Error("SERVICE_NOT_OFFERED");
     }
     const busy: Interval[] = [

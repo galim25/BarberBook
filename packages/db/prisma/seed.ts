@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { SERVICE_DEFINITIONS } from "@barberbook/shared";
+import { MANUAL_SERVICE_DEFINITIONS, SERVICE_DEFINITIONS } from "@barberbook/shared";
 import { prisma } from "../src";
 
 async function main() {
@@ -8,6 +8,13 @@ async function main() {
     await prisma.service.upsert({
       where: { name: service.name },
       update: { duration_minutes: service.duration_minutes, is_child_service: service.is_child_service },
+      create: service,
+    });
+  }
+  for (const service of MANUAL_SERVICE_DEFINITIONS) {
+    await prisma.service.upsert({
+      where: { name: service.name },
+      update: { duration_minutes: service.duration_minutes, is_manual_only: true },
       create: service,
     });
   }

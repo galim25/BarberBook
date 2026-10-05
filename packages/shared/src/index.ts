@@ -14,6 +14,19 @@ export const SERVICE_DEFINITIONS = [
 // the primary barber always offers the full SERVICE_DEFINITIONS list.
 export const SUB_BARBER_SERVICE_NAMES = ["תספורת מבוגר", "תספורת + זקן", "תספורת ילד"] as const;
 
+// Durations the barber picks from when recording a manual appointment (no
+// service choice — just a customer name and how long to block). Each one is
+// backed by a hidden Service row (is_manual_only) so Appointment.service_id
+// stays required and every duration/ends_at computation keeps working as-is.
+// Never offered to customers or the IVR.
+export const MANUAL_APPOINTMENT_DURATIONS = [5, 10, 15] as const;
+export const MANUAL_SERVICE_DEFINITIONS = MANUAL_APPOINTMENT_DURATIONS.map((duration_minutes) => ({
+  name: `תור ידני ${duration_minutes} דק'`,
+  duration_minutes,
+  is_child_service: false,
+  is_manual_only: true,
+}));
+
 export function isServiceAllowedForBarber(barberIsPrimary: boolean, serviceName: string): boolean {
   return barberIsPrimary || (SUB_BARBER_SERVICE_NAMES as readonly string[]).includes(serviceName);
 }

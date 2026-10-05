@@ -19,13 +19,11 @@ function formatHHMM(d: Date) {
 
 export function QuickDayAppointments({
   workDayId,
-  barberId,
   timeline,
   showMoveButton = false,
   freeAsSlots = false,
 }: {
   workDayId: string;
-  barberId: string;
   timeline: TimelineSegment[];
   showMoveButton?: boolean;
   /** Free time is already split into single slots (see `splitFreeSegments`) — show each by its start time only. */
@@ -43,7 +41,6 @@ export function QuickDayAppointments({
               <li key={i} className="py-1">
                 <CreateManualAppointmentForm
                   workDayId={workDayId}
-                  barberId={barberId}
                   initialStartsAt={iso}
                   onCancel={() => setOpenSlotStartsAt(null)}
                 />

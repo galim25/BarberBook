@@ -135,7 +135,6 @@ export default async function AdminPage({
           </div>
           <QuickDayAppointments
             workDayId={nearestWorkDayDetail.id}
-            barberId={selectedBarber.id}
             timeline={nearestDayTimeline}
           />
         </div>
