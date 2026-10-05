@@ -503,44 +503,45 @@ export default function BookAppointmentPage() {
 
       {step === "summary" && (
         <div className="flex flex-col gap-4">
-          <p className="text-ink text-lg font-bold">סיכום התור</p>
-          <dl className="border-barber-teal flex flex-col gap-2 rounded-xl border bg-white p-4">
-            {barber && (
-              <div className="flex justify-between gap-4">
-                <dt className="text-slate-muted">ספר</dt>
-                <dd className="text-ink font-medium">{barber.full_name}</dd>
-              </div>
-            )}
-            <div className="flex justify-between gap-4">
-              <dt className="text-slate-muted">שירות</dt>
-              <dd className="text-ink font-medium">
+          {/* Same look as the "הודעות חשובות" announcement cards on /account. */}
+          <div className="from-barber-teal to-cream rounded-xl bg-gradient-to-bl p-4 text-right">
+            <p className="text-ink text-lg font-bold">סיכום פרטי התור</p>
+            <ul className="text-ink/80 mt-2 flex flex-col gap-1">
+              {barber && (
+                <li>
+                  <span className="text-ink font-bold">ספר: </span>
+                  {barber.full_name}
+                </li>
+              )}
+              <li>
+                <span className="text-ink font-bold">שירות: </span>
                 {service?.name} ({service?.duration_minutes} דק&apos;)
-              </dd>
-            </div>
-            {service?.is_child_service && (
-              <div className="flex justify-between gap-4">
-                <dt className="text-slate-muted">עבור</dt>
-                <dd className="text-ink font-medium">{attendeeName}</dd>
-              </div>
+              </li>
+              {service?.is_child_service && (
+                <li>
+                  <span className="text-ink font-bold">עבור: </span>
+                  {attendeeName}
+                </li>
+              )}
+              <li>
+                <span className="text-ink font-bold">תאריך: </span>
+                {date && formatDate(date.work_date)}
+              </li>
+              <li>
+                <span className="text-ink font-bold">שעה: </span>
+                {slot && formatTime(slot)}
+              </li>
+            </ul>
+            {requiresApproval && (
+              <p className="text-ink/60 mt-2 text-xs">לאחר האישור, התור יישלח לאישור הספר.</p>
             )}
-            <div className="flex justify-between gap-4">
-              <dt className="text-slate-muted">תאריך</dt>
-              <dd className="text-ink font-medium">{date && formatDate(date.work_date)}</dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-slate-muted">שעה</dt>
-              <dd className="text-ink font-medium">{slot && formatTime(slot)}</dd>
-            </div>
-          </dl>
-          {requiresApproval && (
-            <p className="text-slate-muted text-sm">לאחר האישור, התור יישלח לאישור הספר.</p>
-          )}
+          </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button
             type="button"
             onClick={confirm}
             disabled={pending}
-            className="bg-barber-teal text-cream-text rounded-full py-3 text-center text-lg font-bold tracking-wide uppercase disabled:opacity-50"
+            className="bg-barber-teal text-cream-text rounded-full py-3 text-center text-lg font-bold disabled:opacity-50"
           >
             {pending ? "שומר..." : "אישור"}
           </button>
