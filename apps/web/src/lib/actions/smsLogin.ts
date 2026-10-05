@@ -92,7 +92,8 @@ async function sendCode(formData: FormData): Promise<SmsLoginState> {
 
   const code = await issueLoginCode(phone_number);
   try {
-    await getOtpSmsProvider().send(phone_number, `קוד הכניסה שלך ל-BarberBook: ${code}`);
+    // Code first, so it's readable in the phone's notification banner without opening the message.
+    await getOtpSmsProvider().send(phone_number, `קוד הכניסה שלך: ${code}\nבברכה BarberBook`);
   } catch (err) {
     // Message/phone deliberately not logged — the message contains the code.
     console.error("[sms-login] failed to send code:", (err as Error).message);
