@@ -102,10 +102,10 @@ async function notifyAllWaitlistEntries(message: string, exclude_user_id?: strin
 }
 
 /**
- * Called whenever a scheduled appointment frees up (admin cancels it, a
- * customer cancels, a cancellation request is approved, a booking request is
- * rejected). Waitlist members get their own notification (with a Notification
- * row); on top of that EVERY other customer who turned push on gets the same
+ * Called whenever a scheduled appointment frees up (admin cancels it, the
+ * admin or the customer moves it to another time, a customer cancels, a
+ * cancellation request is approved, a booking request is rejected). Waitlist members get their own
+ * notification (with a Notification row); on top of that EVERY other customer who turned push on gets the same
  * message, since anyone might want the slot. `owner_user_id` is the customer
  * whose appointment it was — they already know (they cancelled it, or were
  * told the barber did), so they're skipped in both groups. Entries stay on

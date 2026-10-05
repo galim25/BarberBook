@@ -74,10 +74,11 @@ export async function adminRescheduleAppointmentAction(
   if (!(await requireAdminSession())) return { error: "אין הרשאה" };
 
   type NotifyPayload = { user_id: string; phone_number: string; appointment_id: string; message: string };
+  type FreedSlot = { starts_at: Date; new_starts_at: Date; service_name: string; owner_user_id: string | null };
 
   try {
-    const notify = await prisma.$transaction(
-      async (tx): Promise<NotifyPayload | null> => {
+    const { notify, freed } = await prisma.$transaction(
+      async (tx): Promise<{ notify: NotifyPayload | null; freed: FreedSlot }> => {
         const appointment = await tx.appointment.findUniqueOrThrow({
           where: { id: input.appointment_id },
           include: { service: true, booked_by: true },
@@ -115,12 +116,21 @@ export async function adminRescheduleAppointmentAction(
           data: { work_day_id: input.work_day_id, starts_at, ends_at },
         });
 
-        if (!appointment.booked_by) return null;
+        const freed: FreedSlot = {
+          starts_at: appointment.starts_at,
+          new_starts_at: starts_at,
+          service_name: appointment.service.name,
+          owner_user_id: appointment.booked_by_user_id,
+        };
+        if (!appointment.booked_by) return { notify: null, freed };
         return {
-          user_id: appointment.booked_by.id,
-          phone_number: appointment.booked_by.phone_number,
-          appointment_id: appointment.id,
-          message: `שים/י לב: הספר שינה את מועד התור שלך (${appointment.service.name}) ל-${formatIsraelDate(starts_at)} בשעה ${formatIsraelTime(starts_at)}.`,
+          notify: {
+            user_id: appointment.booked_by.id,
+            phone_number: appointment.booked_by.phone_number,
+            appointment_id: appointment.id,
+            message: `שים/י לב: הספר שינה את מועד התור שלך (${appointment.service.name}) ל-${formatIsraelDate(starts_at)} בשעה ${formatIsraelTime(starts_at)}.`,
+          },
+          freed,
         };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -134,6 +144,12 @@ export async function adminRescheduleAppointmentAction(
         type: "appointment_changed",
         appointment_id: notify.appointment_id,
       });
+    }
+    // Moving away from the old time frees that slot, same as a cancellation would.
+    if (freed.starts_at >= new Date() && freed.starts_at.getTime() !== freed.new_starts_at.getTime()) {
+      await notifyWaitlistOfFreedSlot(freed.starts_at, freed.service_name, freed.owner_user_id).catch((err) =>
+        console.error("[notify] failed to notify waitlist of freed slot:", err),
+      );
     }
 
     revalidatePath(`/admin/day/${input.work_day_id}`);

@@ -15,6 +15,7 @@ import {
   notifyAdminsOfCustomerReschedule,
 } from "@/lib/notifyAdmin";
 import { getRequiresApproval } from "@/lib/actions/settings";
+import { notifyWaitlistOfFreedSlot } from "@/lib/actions/waitlist";
 import { bookAppointmentCore } from "@/lib/actions/bookingCore";
 
 export type ServiceOption = {
@@ -261,6 +262,12 @@ export async function rescheduleAppointmentAction(input: RescheduleInput): Promi
     await notifyAdminsOfCustomerReschedule({ ...moved, customer_name: session.full_name }).catch((err) =>
       console.error("[notify] failed to notify admins of reschedule:", err),
     );
+    // Moving away from the old time frees that slot, same as a cancellation would.
+    if (moved.old_starts_at >= new Date() && moved.old_starts_at.getTime() !== moved.new_starts_at.getTime()) {
+      await notifyWaitlistOfFreedSlot(moved.old_starts_at, moved.service_name, session.sub).catch((err) =>
+        console.error("[notify] failed to notify waitlist of freed slot:", err),
+      );
+    }
     return { success: true };
   } catch (err) {
     if (err instanceof Error && err.message === "SLOT_TAKEN") {
