@@ -2,14 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { subscribeToPushAction, unsubscribeFromPushAction } from "@/lib/actions/push";
+import { isIos, isIosStandalone } from "@/lib/ios";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
 function isStandaloneIos() {
-  return (
-    /iphone|ipad|ipod/i.test(window.navigator.userAgent) &&
-    (window.navigator as Navigator & { standalone?: boolean }).standalone !== true
-  );
+  return isIos() && !isIosStandalone();
 }
 
 // PushManager.subscribe needs the VAPID key as raw bytes, not the base64url string it's stored as.
