@@ -29,10 +29,10 @@
 
 | קובץ | תוכן |
 |---|---|
-| `docs/# PRD BarberBook.txt` | דרישות מוצר, User Stories (US-001..US-025), Functional Requirements (FR-1..FR-35) |
+| `docs/# PRD BarberBook.txt` | דרישות מוצר: User Stories (US-001..US-025 מקוריים + **US-026..US-034 תוספות**), Functional Requirements (FR-1..FR-35 + **FR-36..FR-46**). הערה בראשו: "SMS" בהתראות = התראה באפליקציה + Push |
 | `docs/# ERD BarberBook.txt` | מודל נתונים — Mermaid + טבלאות שדות (**עודכן 2026-10-06** מול `schema.prisma`) |
 | `docs/# STACK BarberBook.txt` | ארכיטקטורת מערכת |
-| `docs/# IVR BarberBook.txt` | קביעת תור טלפונית (ימות המשיח): החלטות, תסריט שיחה מלא, סטטוס מימוש — **קראו במלואו לפני שממשיכים את הפיצ'ר** |
+| `docs/# IVR BarberBook.txt` | קביעת תור טלפונית (ימות המשיח): סיכום מצב עדכני בראש המסמך, 21 החלטות, תסריט שיחה מלא — **קראו במלואו לפני שממשיכים את הפיצ'ר** |
 | `docs/SMS-LOGIN.md` | כניסת לקוחות עם קוד SMS — עיצוב, הגנות, ספק 019sms, תרחישי הדלקה/כיבוי |
 | `docs/DEPLOY.md` | פריסה לפרודקשן עם Docker (כולל bootstrap של SSL, הערת `NEXT_PUBLIC_*` ותקלת 2026-10-06) |
 | `scripts/deploy.sh` | סקריפט עדכון קוד בפרודקשן: pull → build → החלפת קונטיינרים → migrate → בדיקת תקינות |
@@ -52,7 +52,7 @@
 
 ### פתוח / לא נבדק
 - **פרודקשן אמיתי (Docker, `yossibarberbook.co.il`):** כניסה בקוד SMS **לא נפרסה** לפי המידע האחרון (2026-09-22) — דורשת `pnpm db:migrate` (migrations `20260922130000_add_login_codes` ואילך) והגדרת `CUSTOMER_LOGIN_MODE`/`SMS_PROVIDER`/פרטי 019sms ב-`.env` שם. מצב ההעברה לשרת החדש מתועד ב-`docs/DEPLOY.md`; לאמת מול השרת לפני הנחות.
-- **IVR:** הקוד עובר build/lint/test, אך לא נבדק מול שיחה אמיתית מקצה-לקצה (כתיבת תור בפועל לא אומתה; סימון "נקבע בטלפון" אצל הספר ושילוב IVR + כניסת SMS לא נבדקו).
+- **IVR:** נבדק מול שיחות אמיתיות כולל **כתיבת תור בפועל** (2026-08-08). **לא נבדק:** סימון "נקבע בטלפון" אצל הספר (רק `tsc`/טסטים), שילוב IVR + כניסת SMS, והפניית ה-`api_link` בימות המשיח לדומיין האמיתי בפרודקשן (DEPLOY שלב 5) — לא אומת שבוצעה.
 - **worker:** `pnpm build` (`tsc`) + `node dist/index.js` לא עובד (ראו סעיף 4) — רץ דרך `tsx`. בשרת הפיתוח רץ תחת pm2 בשם `barberbook-worker`; **`pm2 save` לא הורץ**, אז לא ישרוד אתחול שרת.
 - **איפוס סיסמה** (`forgotPasswordAction`) לא שולח כלום ב-`password` mode (`getSmsProvider()` הוא Noop). ב-`sms_code` mode הוא סגור ממילא.
 - **אין revocation לסשן** בעת reset סיסמה (JWT stateless) — דורש החלטה אדריכלית (ראו סעיף 12).
@@ -305,7 +305,7 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 
 ## 11. קביעת תור טלפונית (IVR)
 
-ספק: **ימות המשיח** (הוחלף מ-Twilio ב-2026-08-04 — Twilio לא מציע מספרים ישראליים). קו `0772248273`. מסמך מלא: `docs/# IVR BarberBook.txt`.
+ספק: **ימות המשיח** (הוחלף מ-Twilio ב-2026-08-04 — Twilio לא מציע מספרים ישראליים). קו `0772248273`. מסמך מלא: `docs/# IVR BarberBook.txt`. **סטטוס:** נבדק מול שיחות אמיתיות כולל כתיבת תור (2026-08-08) ונחשב פונקציונלי; פתוח רק ליטוש נוסח וחיבור ה-`api_link` לדומיין בפרודקשן.
 
 ### ארכיטקטורה
 - לוגיקת עסק תלוית-ספק-אפס, משותפת עם האפליקציה: `bookAppointmentCore` (`lib/actions/bookingCore.ts`), `registerUserCore` (`registerCore.ts`), מכונת מצבים של השיחה ב-`lib/ivr/flow.ts` (`startCall`/`continueCall`, `CallState`).

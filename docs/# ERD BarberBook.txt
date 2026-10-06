@@ -657,18 +657,18 @@ Indexes: `(user_id)`, `(status, scheduled_at)`.
 | US-024     | Appointment, CancellationRequest, BookingRequest, WaitlistEntry, Notification |
 | US-025     | WorkDay, WaitlistEntry, Notification                          |
 
-**תוספות מעבר ל-PRD (ללא מספר US, נוספו לפי בקשות ישירות):**
+**תוספות שנוספו אחרי ה-PRD המקורי (לפי בקשות ישירות; מתועדות ב-PRD כ-US-026..US-034):**
 
 | פיצ'ר | תאריך | Entities Involved |
 |---|---|---|
-| חסימת יום מקביעת תורים ע"י לקוחות | 2026-07-26 | WorkDay (`is_blocked`), Appointment |
-| ספרי משנה / יומן לכל ספר | 2026-08-03 | Barber, WorkDay (`barber_id`), Service, Appointment |
-| קביעת תור טלפונית (IVR) + מתג כיבוי | 2026-08-04/09 | Appointment (`booked_via_ivr`), AppSettings (`ivr_enabled`), User, Service, Barber |
-| Web Push למנהל וללקוחות | 2026-09-06 / 09-21 | PushSubscription, Notification (`booking_request_pending`, `cancellation_request_pending`, `customer_registered`), User |
-| כניסת לקוחות עם קוד SMS | 2026-09-22 | LoginCode, User, BlockedPhoneNumber |
-| אנשי קשר של הספר (שמות מהטלפון) | 2026-10-05 | ContactName, User, BlockedPhoneNumber |
-| תור ידני לפי משך (בלי שירות) | 2026-10-05 | Service (`is_manual_only`), Appointment |
-| מתג "התראה כשמתפנה תור" | 2026-10-06 | WaitlistEntry (`notify_freed_slots`), Notification |
+| חסימת יום מקביעת תורים ע"י לקוחות (US-028) | 2026-07-26 | WorkDay (`is_blocked`), Appointment |
+| ספרי משנה / יומן לכל ספר (US-027) | 2026-08-03 | Barber, WorkDay (`barber_id`), Service, Appointment |
+| קביעת תור טלפונית (IVR) + מתג כיבוי (US-029) | 2026-08-04/09 | Appointment (`booked_via_ivr`), AppSettings (`ivr_enabled`), User, Service, Barber |
+| Web Push למנהל וללקוחות (US-030) | 2026-09-06 / 09-21 | PushSubscription, Notification (`booking_request_pending`, `cancellation_request_pending`, `customer_registered`), User |
+| כניסת לקוחות עם קוד SMS (US-026) | 2026-09-22 | LoginCode, User, BlockedPhoneNumber |
+| אנשי קשר של הספר (שמות מהטלפון) (US-031) | 2026-10-05 | ContactName, User, BlockedPhoneNumber |
+| תור ידני לפי משך (בלי שירות) (US-032) | 2026-10-05 | Service (`is_manual_only`), Appointment |
+| מתג "התראה כשמתפנה תור" (US-034) | 2026-10-06 | WaitlistEntry (`notify_freed_slots`), Notification |
 
 ## 8. Open Questions / Design Notes
 
