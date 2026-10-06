@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma, sendPushToCustomers } from "@barberbook/db";
+import { prisma } from "@barberbook/db";
 import { formatIsraelDate, formatIsraelTime } from "@barberbook/shared";
 import { getSession } from "@/lib/auth/session";
 import { getContactNameMap } from "@/lib/contactNames";
@@ -61,6 +61,30 @@ export async function isOnWaitlist(): Promise<boolean> {
   return entry !== null;
 }
 
+/** null when the customer isn't on the waitlist. */
+export async function getMyWaitlistEntry(): Promise<{ notify_freed_slots: boolean } | null> {
+  const session = await getSession();
+  if (!session) return null;
+  return prisma.waitlistEntry.findUnique({
+    where: { user_id: session.sub },
+    select: { notify_freed_slots: true },
+  });
+}
+
+export async function setNotifyFreedSlotsAction(enabled: boolean): Promise<BookingResult> {
+  const session = await getSession();
+  if (!session) return { error: "יש להתחבר" };
+
+  const { count } = await prisma.waitlistEntry.updateMany({
+    where: { user_id: session.sub },
+    data: { notify_freed_slots: enabled },
+  });
+  if (count === 0) return { error: "את/ה כבר לא ברשימת ההמתנה" };
+
+  revalidatePath("/account");
+  return { success: true };
+}
+
 export type WaitlistEntryView = {
   id: string;
   customer_name: string;
@@ -89,8 +113,13 @@ export async function removeWaitlistEntryAction(id: string): Promise<BookingResu
   return { success: true };
 }
 
-async function notifyAllWaitlistEntries(message: string, exclude_user_id?: string | null): Promise<string[]> {
-  const entries = (await prisma.waitlistEntry.findMany()).filter((e) => e.user_id !== exclude_user_id);
+async function notifyAllWaitlistEntries(
+  message: string,
+  { exclude_user_id, freedSlotsOnly = false }: { exclude_user_id?: string | null; freedSlotsOnly?: boolean } = {},
+): Promise<void> {
+  const entries = (
+    await prisma.waitlistEntry.findMany({ where: freedSlotsOnly ? { notify_freed_slots: true } : undefined })
+  ).filter((e) => e.user_id !== exclude_user_id);
   // In parallel: each one now also does a network push, and the barber's action is waiting on this.
   await Promise.all(
     entries.map((entry) =>
@@ -102,17 +131,16 @@ async function notifyAllWaitlistEntries(message: string, exclude_user_id?: strin
       }),
     ),
   );
-  return entries.map((e) => e.user_id);
 }
 
 /**
  * Called whenever a scheduled appointment frees up (admin cancels it, the
  * admin or the customer moves it to another time, a customer cancels, a
- * cancellation request is approved, a booking request is rejected). Waitlist members get their own
- * notification (with a Notification row); on top of that EVERY other customer who turned push on gets the same
- * message, since anyone might want the slot. `owner_user_id` is the customer
- * whose appointment it was — they already know (they cancelled it, or were
- * told the barber did), so they're skipped in both groups. Entries stay on
+ * cancellation request is approved, a booking request is rejected). Only waitlist members who left
+ * `notify_freed_slots` on are told (Notification row + push) — customers off the waitlist are not
+ * (decision 2026-10-06; until then every push-subscribed customer got it). `owner_user_id` is the
+ * customer whose appointment it was — they already know (they cancelled it, or were
+ * told the barber did), so they're skipped. Entries stay on
  * the waitlist afterward (no auto-removal); the admin or the customer removes
  * them explicitly.
  */
@@ -122,11 +150,7 @@ export async function notifyWaitlistOfFreedSlot(
   owner_user_id?: string | null,
 ): Promise<void> {
   const message = `התפנה תור ל${service_name} בתאריך ${formatIsraelDate(starts_at)} בשעה ${formatIsraelTime(starts_at)} — מיהרו לקבוע!`;
-  const notifiedUserIds = await notifyAllWaitlistEntries(message, owner_user_id);
-  await sendPushToCustomers(
-    { title: "יש תור פנוי", body: message, url: "/account/book" },
-    { excludeUserIds: [...notifiedUserIds, ...(owner_user_id ? [owner_user_id] : [])] },
-  );
+  await notifyAllWaitlistEntries(message, { exclude_user_id: owner_user_id, freedSlotsOnly: true });
 }
 
 /**

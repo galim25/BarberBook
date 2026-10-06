@@ -3,8 +3,9 @@ import { ISRAEL_TIME_ZONE } from "@barberbook/shared";
 import { getSession } from "@/lib/auth/session";
 import { logoutAction } from "@/lib/actions/auth";
 import { getAnnouncements } from "@/lib/actions/announcements";
-import { isOnWaitlist } from "@/lib/actions/waitlist";
+import { getMyWaitlistEntry } from "@/lib/actions/waitlist";
 import { LeaveWaitlistButton } from "./LeaveWaitlistButton";
+import { FreedSlotNotifyToggle } from "./FreedSlotNotifyToggle";
 import { BrandHero } from "@/components/BrandHero";
 import { BsdBar } from "@/components/BsdBar";
 import { PushNotificationToggle } from "@/components/PushNotificationToggle";
@@ -16,7 +17,7 @@ function formatDate(d: Date) {
 export default async function AccountPage() {
   const session = await getSession();
   const announcements = await getAnnouncements();
-  const onWaitlist = await isOnWaitlist();
+  const waitlistEntry = await getMyWaitlistEntry();
 
   return (
     <main dir="rtl" className="bg-cream mx-auto flex min-h-screen max-w-md flex-col p-6">
@@ -41,10 +42,13 @@ export default async function AccountPage() {
 
       <PushNotificationToggle audience="customer" />
 
-      {onWaitlist && (
-        <div className="border-barber-teal mt-4 flex items-center justify-between rounded-xl border bg-white p-4">
-          <p className="text-ink text-sm">את/ה ברשימת ההמתנה לתור פנוי</p>
-          <LeaveWaitlistButton />
+      {waitlistEntry && (
+        <div className="border-barber-teal mt-4 flex flex-col gap-3 rounded-xl border bg-white p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-ink text-sm">את/ה ברשימת ההמתנה לתור פנוי</p>
+            <LeaveWaitlistButton />
+          </div>
+          <FreedSlotNotifyToggle initialValue={waitlistEntry.notify_freed_slots} />
         </div>
       )}
 

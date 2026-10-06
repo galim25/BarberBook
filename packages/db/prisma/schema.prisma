@@ -347,6 +347,9 @@ model WaitlistEntry {
   user_id       String   @unique
   customer_name String
   phone_number  String
+  // Customer's own switch on /account: whether "a slot freed up" alerts reach them.
+  // New-day / extended-hours alerts ignore it — those are the reason to be on the list.
+  notify_freed_slots Boolean @default(true)
   created_at    DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
