@@ -290,13 +290,6 @@ model Notification {
   @@map("notifications")
 }
 
-/**
- * One row per browser/device that opted into real Web Push notifications
- * (Notification/PushManager APIs) — distinct from Notification above, which
- * is only the in-app badge/feed. An administrator can have several rows
- * (e.g. phone + desktop). endpoint is unique per browser install, so
- * re-subscribing the same device upserts instead of duplicating.
- */
 /// One-time SMS login code (docs/SMS-LOGIN.md). Keyed by phone number, not user, because a brand-new
 /// customer has no User row yet. Only an HMAC of the code is stored, never the code itself.
 model LoginCode {
@@ -313,6 +306,13 @@ model LoginCode {
   @@map("login_codes")
 }
 
+/**
+ * One row per browser/device that opted into real Web Push notifications
+ * (Notification/PushManager APIs) — distinct from Notification above, which
+ * is only the in-app badge/feed. A user (customer or administrator) can have
+ * several rows (e.g. phone + desktop). endpoint is unique per browser install,
+ * so re-subscribing the same device upserts instead of duplicating.
+ */
 model PushSubscription {
   id         String   @id @default(cuid())
   user_id    String

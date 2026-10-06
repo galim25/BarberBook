@@ -1,269 +1,404 @@
 # BarberBook — מערכת ניהול תורים למספרה
 
-אפליקציה לניהול תורים עבור ספר עצמאי. לקוחות קובעים, משנים ומבקשים לבטל תורים בעצמם לפי הזמינות שהספר מגדיר; הספר מנהל את היומן במלואו מתוך מסך ניהול.
+אפליקציה לניהול תורים עבור ספר עצמאי. לקוחות קובעים, משנים ומבקשים לבטל תורים בעצמם (באפליקציה או בטלפון) לפי הזמינות שהספר מגדיר; הספר מנהל את היומן במלואו מתוך מסך ניהול.
 
-מסמכי המקור המלאים נמצאים ב-`docs/`:
-- `# PRD BarberBook.txt` — דרישות מוצר, User Stories, Functional Requirements
-- `# ERD BarberBook.txt` — מודל נתונים (Mermaid ERD + טבלאות שדות)
-- `# STACK BarberBook.txt` — ארכיטקטורת מערכת
-- `# IVR BarberBook.txt` — **ימות המשיח (הוחלף מ-Twilio ב-2026-08-04). קו נרכש
-  ב-2026-08-05 (`0772248273`), `.env` מלא (`YEMOT_PHONE_NUMBER`/`YEMOT_WEBHOOK_SECRET`/
-  `PUBLIC_BASE_URL` דרך דומיין ngrok סטטי `marlin-capitol-carat.ngrok-free.dev`),
-  ותחביר `read=`/רשימת תווים אסורים תוקנו בקוד לפי מקור קהילתי מפורט (freeivr.co.il
-  post/76) — השלוחה הוגדרה ובוצעה שיחת בדיקה אמיתית ראשונה (2026-08-08, עד הצעת
-  התור הקרוב ביותר, לא עד אישור סופי) + נוספה בחירת טווח שעות (בוקר/צהריים/ערב)**
-  — קביעת תור טלפונית (מענה קולי אוטומטי, DTMF). כל ההחלטות שסוכמו + תסריט שיחה
-  מלא + סטטוס מימוש מעודכן. קרא במלואו לפני שממשיכים את הפיצ'ר הזה.
+> **עודכן לאחרונה: 2026-10-06** — המסמך סודר מחדש לפי קטגוריות ועודכן מול הקוד וההיסטוריה (62 commits). הגרסה הקודמת (לא מסודרת) נשמרה ב-`docs/archive/CLAUDE.md.bak-2026-10-06`.
 
-קרא את הקבצים המלאים לפני שינויים משמעותיים — הסיכום כאן חלקי בכוונה.
+## תוכן עניינים
 
-## 🔖 איפה עצרנו (עודכן 2026-09-22, צהריים) — קראו קודם
+1. [מסמכי מקור](#1-מסמכי-מקור)
+2. [🔖 מצב נוכחי ופתוח — קראו קודם](#2--מצב-נוכחי-ופתוח--קראו-קודם)
+3. [מוצר: משתמשים, שירותים, מחוץ לסקופ](#3-מוצר-משתמשים-שירותים-מחוץ-לסקופ)
+4. [ארכיטקטורה ותשתית](#4-ארכיטקטורה-ותשתית)
+5. [מודל נתונים](#5-מודל-נתונים)
+6. [חוקי עסק קריטיים](#6-חוקי-עסק-קריטיים)
+7. [פיצ'רים — צד לקוח](#7-פיצרים--צד-לקוח)
+8. [פיצ'רים — צד ספר (`/admin`)](#8-פיצרים--צד-ספר-admin)
+9. [התראות (In-app, Push, SMS)](#9-התראות-in-app-push-sms)
+10. [כניסה והתחברות](#10-כניסה-והתחברות)
+11. [קביעת תור טלפונית (IVR)](#11-קביעת-תור-טלפונית-ivr)
+12. [אבטחה והרשאות](#12-אבטחה-והרשאות)
+13. [עיצוב (Design System)](#13-עיצוב-design-system)
+14. [תחזוקה, תלויות ובדיקות](#14-תחזוקה-תלויות-ובדיקות)
 
-**כניסת לקוחות עם קוד SMS — 🟢 חי בשרת הפיתוח, במקום סיסמה/הרשמה** (החלטת המשתמשת, אחרי ניתוח סיכונים). **מסמך מלא: [`docs/SMS-LOGIN.md`](docs/SMS-LOGIN.md).**
-- **סטטוס:** נבדק קצה-לקצה בדפדפן כולל SMS אמיתי דרך 019sms (username `Galimadar`, sender ID מאושר `BarberBook`) — כל התרחישים תקינים (לקוח קיים, קוד שגוי, שליחה חוזרת, מספר חדש, מספר חסום, מספר מנהל, כניסת מנהל). `apps/web/.env` בשרת הפיתוח: `CUSTOMER_LOGIN_MODE="sms_code"`, `SMS_PROVIDER="019"`.
-- **פתוח, לא חוסם:** לא נבדק עם שיחת IVR/הרשמה טלפונית בשילוב. פריסה לפרודקשן האמיתי (Docker, `yossibarberbook.co.il`) עדיין לא נעשתה — דורשת `pnpm db:migrate` (migration `20260922130000_add_login_codes`) והגדרת אותם משתני env שם. רשימת שיפורים לא-חוסמים בסעיף 5 במסמך (הגבלת מספרי קו נייח, WebOTP, ניקוי קוד הרשמה/סיסמה הישן וכו').
-- **המנהל נשאר עם סיסמה בכל מצב** (`/login/admin`); מספרו פשוט/ידוע ולכן אסור לאפשר לו כניסה בקוד/טלפון בלבד.
-- **פתוח בנפרד:** איפוס סיסמה (`forgotPasswordAction`) עדיין לא שולח כלום כי `getSmsProvider()` הוא Noop — במצב `sms_code` הוא סגור ממילא; נשאר רלוונטי רק אם נשארים במצב סיסמה.
-- **נעשה היום ונדחף (2026-09-21/22):** Push ללקוחות + התראות מנהל (`ebcb908`), סימון תור שנקבע בטלפון + חיוג (`fece809`) — פירוט בסעיפי המצב למטה.
+---
 
-**🔴 תוקן 2026-10-05 — Push לא עבד בכלל בפרודקשן (Docker), למרות שעבד בשרת הפיתוח.** הספר התקין את ה-PWA ואישר התראות בהגדרות אנדרואיד, ולא קיבל כלום; גם הלקוח לא קיבל התראה על ביטול תור. הסיבה אחת לשני התסמינים: `NEXT_PUBLIC_VAPID_PUBLIC_KEY` נטמע ע"י `next build` **בזמן build**, אבל ב-Docker הוא לא היה זמין אז — `env_file: .env` הוא runtime בלבד, ו-`.dockerignore` מוציא כל `.env` מה-build context. התוצאה: המפתח התקמפל כ-`undefined` → `<PushNotificationToggle/>` החזיר `null` → **כפתור "הפעלת התראות" לא הוצג כלל** → אין אף שורה ב-`PushSubscription` → `sendPushToAdmins`/`sendPushToUser` לא מצאו למי לשלוח ושתקו. הצד השרתי היה תקין כל הזמן. **התיקון:** `ARG`/`ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY` בשלב `build` ב-`Dockerfile` + `build.args` בשירות `web` ב-`docker-compose.yml`. **מסקנה כללית לכל `NEXT_PUBLIC_*` שיתווסף בעתיד: חייב `ARG` ב-`Dockerfile` + `build.args` ב-compose — `env_file` לא מספיק, ושינוי ערך מחייב `docker compose build` ולא רק `up -d`.** ראו את ההערה המלאה ב-`docs/DEPLOY.md`.
+## 1. מסמכי מקור
 
-## Stack וארכיטקטורה
+קראו את הקבצים המלאים לפני שינויים משמעותיים — הסיכום כאן חלקי בכוונה.
+
+| קובץ | תוכן |
+|---|---|
+| `docs/# PRD BarberBook.txt` | דרישות מוצר, User Stories (US-001..US-025), Functional Requirements (FR-1..FR-35) |
+| `docs/# ERD BarberBook.txt` | מודל נתונים — Mermaid + טבלאות שדות (**עודכן 2026-10-06** מול `schema.prisma`) |
+| `docs/# STACK BarberBook.txt` | ארכיטקטורת מערכת |
+| `docs/# IVR BarberBook.txt` | קביעת תור טלפונית (ימות המשיח): החלטות, תסריט שיחה מלא, סטטוס מימוש — **קראו במלואו לפני שממשיכים את הפיצ'ר** |
+| `docs/SMS-LOGIN.md` | כניסת לקוחות עם קוד SMS — עיצוב, הגנות, ספק 019sms, תרחישי הדלקה/כיבוי |
+| `docs/DEPLOY.md` | פריסה לפרודקשן עם Docker (כולל bootstrap של SSL, הערת `NEXT_PUBLIC_*` ותקלת 2026-10-06) |
+| `scripts/deploy.sh` | סקריפט עדכון קוד בפרודקשן: pull → build → החלפת קונטיינרים → migrate → בדיקת תקינות |
+| `security/*.md`, `privacy/*.md` | ממצאי ביקורת אבטחה (תשתית/תוכנה/סוכן) ותיקון 13 לחוק הגנת הפרטיות |
+| `.claude/skills/barberbook-design/SKILL.md` | כללי עיצוב — לטעון לפני כל שינוי UI |
+
+---
+
+## 2. 🔖 מצב נוכחי ופתוח — קראו קודם
+
+### מה חי ועובד
+- **כל ה-PRD (US-001..US-025, FR-1..FR-35) ממומש.** תוספות מעבר ל-PRD (לא ממוספרות, נוספו לפי בקשה ישירה): חסימת יום, ספרי משנה, IVR, Push, כניסה בקוד SMS, אנשי קשר, תור ידני לפי משך.
+- **כניסת לקוחות עם קוד SMS — 🟢 חי בשרת הפיתוח** (מ-2026-09-22), במקום סיסמה/הרשמה. נבדק קצה-לקצה בדפדפן כולל SMS אמיתי דרך 019sms. פירוט בסעיף 10 ו-`docs/SMS-LOGIN.md`.
+- **Push ללקוחות ולמנהל** — נבדק במכשיר אמיתי בשרת הפיתוח. בפרודקשן (Docker) תוקן 2026-10-05 (ראו הכלל על `NEXT_PUBLIC_*` בסעיף 4).
+- **אנשי קשר של הספר** (2026-10-05) — שמות לקוחות כפי ששמורים בטלפון של הספר, מוצגים בכל מסכי `/admin` (סעיף 8).
+- **מתג "התראה כשמתפנה תור"** ללקוח ברשימת ההמתנה (2026-10-06) — ראו סעיף 9.
+
+### פתוח / לא נבדק
+- **פרודקשן אמיתי (Docker, `yossibarberbook.co.il`):** כניסה בקוד SMS **לא נפרסה** לפי המידע האחרון (2026-09-22) — דורשת `pnpm db:migrate` (migrations `20260922130000_add_login_codes` ואילך) והגדרת `CUSTOMER_LOGIN_MODE`/`SMS_PROVIDER`/פרטי 019sms ב-`.env` שם. מצב ההעברה לשרת החדש מתועד ב-`docs/DEPLOY.md`; לאמת מול השרת לפני הנחות.
+- **IVR:** הקוד עובר build/lint/test, אך לא נבדק מול שיחה אמיתית מקצה-לקצה (כתיבת תור בפועל לא אומתה; סימון "נקבע בטלפון" אצל הספר ושילוב IVR + כניסת SMS לא נבדקו).
+- **worker:** `pnpm build` (`tsc`) + `node dist/index.js` לא עובד (ראו סעיף 4) — רץ דרך `tsx`. בשרת הפיתוח רץ תחת pm2 בשם `barberbook-worker`; **`pm2 save` לא הורץ**, אז לא ישרוד אתחול שרת.
+- **איפוס סיסמה** (`forgotPasswordAction`) לא שולח כלום ב-`password` mode (`getSmsProvider()` הוא Noop). ב-`sms_code` mode הוא סגור ממילא.
+- **אין revocation לסשן** בעת reset סיסמה (JWT stateless) — דורש החלטה אדריכלית (ראו סעיף 12).
+- **בדיקה ידנית בדפדפן שטרם נעשתה:** FR-28 (שעה שעברה נעלמת מהרשימה), US-025 (הודעת הרחבת שעות אמיתית), מתג `notify_freed_slots`.
+- **שיפורים לא-חוסמים לכניסת SMS** (הגבלת קו נייח, WebOTP, ניקוי קוד הרשמה/סיסמה ישן): סעיף 5 ב-`docs/SMS-LOGIN.md`.
+- **סימון "נקבע בטלפון"** לא מוצג בדפי בקשות-אישור/ביטול ובהתראת המנהל על תור חדש (אפשר להוסיף). תורי IVR לפני 2026-09-22 לא מסומנים.
+- **שלוש שדרוגי תלויות נדחו בכוונה** (Prisma 7, TypeScript 7, ESLint 10) — ראו סעיף 14.
+
+---
+
+## 3. מוצר: משתמשים, שירותים, מחוץ לסקופ
+
+### משתמשים
+- **לקוח** — נכנס עם טלפון (+ קוד SMS, או סיסמה במצב `password`), קובע תורים לעצמו ולילדיו, משנה תור, שולח בקשת ביטול (טעונה אישור הספר כשהמדיניות דלוקה), מקבל תזכורות והודעות.
+- **מנהל מערכת (הספר)** — פותח ימי עבודה (תאריך, שעת התחלה/סיום, הפסקות), רואה ומנהל את כל היומן, קובע תורים ידנית, מבטל/מוחק תורים וימים (עם אזהרת אישור), מפרסם הודעות כלליות, מאשר/דוחה בקשות, מנהל ספרי משנה, חסימות ורשימת המתנה.
+
+**שם המנהל.** השם המוצג ("היי [שם]") הוא `User.full_name` של חשבון ה-administrator. **התחברות המנהל אחת ויחידה** — אין ריבוי חשבונות admin. כרגע "יוסי הספר". למסירה לספר אחר: לשנות `ADMIN_FULL_NAME` ב-`packages/db/prisma/seed.ts` ולהריץ `pnpm db:seed` (אידמפוטנטי — `upsert` לפי `phone_number`, מעדכן גם חשבון קיים וגם את `Barber` הראשי). זה נפרד מזהות ה"ספר" ביומן (ספרי משנה — סעיף 8).
+
+### שירותים ומשכי זמן (קבועים ב-PRD, לא להמציא ערכים אחרים)
+מקור יחיד: `SERVICE_DEFINITIONS` ב-`packages/shared/src/index.ts`.
+
+| שירות | משך | הערות |
+|---|---|---|
+| תספורת מבוגר | 10 דק' | מוצע גם לספר-משנה וב-IVR |
+| תספורת + זקן | 15 דק' | מוצע גם לספר-משנה וב-IVR |
+| תספורת ילד | 10 דק' | `is_child_service` → נדרש שם ילד; מוצע גם לספר-משנה וב-IVR |
+| הסרת שיער בלייזר | 10 דק' | ספר ראשי בלבד, לא ב-IVR |
+| חלאקה | 15 דק' | ספר ראשי בלבד, לא ב-IVR |
+| תספורת מבוגר + טיפול לייזר | 20 דק' | ספר ראשי בלבד, לא ב-IVR |
+
+בנוסף, 3 **שירותים מוסתרים לתור ידני** (`Service.is_manual_only`, "תור ידני 5/10/15 דק'") — לא חלק מהקטלוג ללקוח/IVR (סעיף 8).
+
+### מחוץ לסקופ
+תשלום/סליקת אשראי, מערכת נאמנות, דירוגים/ביקורות, ריבוי סניפים/מספרות, צ'אט לקוח-ספר. (ריבוי **ספרים** באותה מספרה כן קיים.)
+
+---
+
+## 4. ארכיטקטורה ותשתית
 
 ```
-Browser / Mobile Web
-   → Nginx (aaPanel)
-   → Next.js App Container (מסכי לקוח, מסכי ניהול, API/Server Actions, Auth)
+Browser / Mobile Web (PWA)
+   → Nginx (HTTPS)
+   → Next.js App Container (מסכי לקוח, מסכי ניהול, Server Actions, API ל-IVR, Auth)
    → PostgreSQL
    ↑
-Worker Container — שולח תזכורות, החלטות ביטול, SMS על שינוי תור
+Worker Container — תזכורות לפני תור (in-app + push, בלי SMS), ניקוי קודי כניסה ישנים
 ```
 
-**ידוע ופתוח:** `apps/worker`'s `pnpm build` (`tsc`) + `pnpm start` (`node dist/index.js`) לא עובד כרגע בפועל — `packages/shared`/`packages/db` נצרכים כמקור TS ישיר (בלי build step משלהם), ו-Node הרץ-CommonJS-רגיל לא יודע לפענח את זה. עד שזה יתוקן, מריצים את ה-worker דרך `pnpm exec tsx --env-file=.env src/index.ts` (בלי `--watch` לריצה יציבה ארוכת-טווח) — זה עובד תקין (`tsx` מתרגם TS "on the fly", כולל בין-חבילתי), רק שזה טכנית dev-runtime ולא בינארי מקומפל.
+**מונוריפו pnpm:** `apps/web` (Next.js 16) · `apps/worker` (node-cron) · `packages/db` (Prisma + `web-push`) · `packages/shared` (קבועים, SMS providers, עזרי זמן). `packages/*` נצרכים כמקור TS ישיר (בלי build step משלהם).
 
-**Docker (נוסף 2026-08-31):** `Dockerfile` יחיד בשורש (targets `web`/`worker`, חולק שלבי deps/build כי שני האפליקציות תלויות באותו workspace), `docker-compose.yml` (postgres · web · worker · nginx · certbot), ו-`nginx/templates/default.conf.template` (HTTPS + headers בסיסיים, בלי CSP — ראה הערה בקובץ). מדריך הרצה מלא (כולל ה-bootstrap הידוע של תעודת SSL עצמית זמנית) ב-`docs/DEPLOY.md`. worker רץ בקונטיינר שלו גם דרך `tsx` (אותה מגבלה כמו למעלה — לא בינארי מקומפל, וזה בסדר).
+### הרצה ו-build
+- **`pnpm dev` / `pnpm build` בלבד — לעולם לא `next build`/`next dev` ישירות.** Next 16 משתמש ב-Turbopack כברירת מחדל ו-Serwist (webpack) מתנגש איתו; `apps/web/package.json` מגדיר `next dev --webpack` ו-`next build --webpack`. בלי הדגל `dev` קורס ("This build is using Turbopack, with a `webpack` config…").
+- `pnpm test` (בתוך `apps/web`) — `node --import tsx --test src/**/*.test.ts`. טסטים קיימים: `availability`, `dayTimeline`, `contacts`, `pushEndpoint`, `sms019`, `smsLoginCore`.
+- **worker:** `pnpm build`/`node dist/index.js` לא עובד כי `packages/*` הם TS גולמי ו-Node CommonJS לא מפענח אותם. מריצים דרך `pnpm exec tsx --env-file=.env src/index.ts` (בלי `--watch` לריצה ארוכה); `pnpm worker` מהשורש = `tsx watch` לפיתוח. דורש `apps/worker/.env` עם `DATABASE_URL` (+ `VAPID_*` לפוש). זה dev-runtime ולא בינארי מקומפל — וזה בסדר, גם ב-Docker.
+- **תיקון timezone:** Server Components רצים בשעון השרת, לא בישראל. כל תצוגת זמן חייבת `ISRAEL_TIME_ZONE` מפורש; `zonedTimeToUtc()` (`packages/shared`) ממיר שעון קיר ישראלי (כולל שעון קיץ/חורף, בלי ספריית tz) ל-UTC לכל טפסי הניהול. `formatIsraelDate`/`formatIsraelTime` ב-`packages/shared` (משותפים ל-web ול-worker).
+- `runSerializable()` ב-`apps/web/src/lib/serializableTransaction.ts` (לא בקובץ `"use server"`) — טרנזקציות Serializable לקביעה/שינוי תור.
 
-## משתמשים
+### Docker ופריסה (נוסף 2026-08-31)
+`Dockerfile` יחיד בשורש (targets `web`/`worker`, חולקים שלבי deps/build), `docker-compose.yml` (postgres · web · worker · nginx · certbot), `nginx/templates/default.conf.template` (HTTPS + headers בסיסיים, בלי CSP — ראו הערה בקובץ), `docker-compose.preview.yml`. בסיס Node 22 (נדרש ל-pnpm 11.15). מדריך מלא ב-`docs/DEPLOY.md`.
 
-- **לקוח** — נרשם/מתחבר עם שם מלא + טלפון + סיסמה. קובע תורים לעצמו ולילדיו, משנה תור, שולח בקשת ביטול (טעונה אישור הספר), מקבל תזכורות והודעות.
-- **מנהל מערכת (הספר)** — פותח ימי עבודה (תאריך, שעת התחלה/סיום, הפסקות), רואה ומנהל את כל היומן, קובע תורים ידנית, מוחק תורים/ימים שלמים (עם אזהרת אישור), מפרסם הודעות כלליות, מאשר/דוחה בקשות ביטול.
+> **עדכון קוד בפרודקשן — תמיד דרך `bash scripts/deploy.sh` (נוסף 2026-10-06), לא `git pull && docker compose build && up -d` ידני.** הסקריפט: בדיקות מקדימות (קיום `.env`, אין שינויים מקומיים ב-git, אין קבצי `.env*` נוספים בתיקייה) ← `git pull --ff-only` ← `docker compose build web worker` ← `up -d --force-recreate web worker` ← השוואת מספר ה-migrations בקונטיינר מול הקוד ← `migrate` (ומאמת "N migrations found" = מספר התיקיות) ← בדיקת `/login` (200) — ועוצר בשגיאה ברורה בשלב הראשון שנכשל.
+> **למה:** תקלה אמיתית ב-2026-10-06 — אחרי `build` הקונטיינר `web` לא הוחלף והמשיך להגיש בנייה ישנה ופגומה (מסך "ניהול יום" קרס), ו-`migrate` שרץ בתוכו ראה רק migrations ישנים, הדפיס "No pending migrations" ודילג בשקט על החדשה (`/account` קרס אחרי כניסת לקוח). בנוסף `.dockerignore` מוציא עכשיו כל `.env*` מה-build context (קובץ `.env_old` תועד כמי שהועתק לאימג'); גיבויי `.env` — מחוץ לתיקיית הפרויקט.
+> **תיקיית העבודה במיכל `web` היא `apps/web`**, לכן ידנית: `docker compose exec web pnpm --filter @barberbook/db run migrate` (לא `pnpm db:migrate`).
 
-### שם מנהל המערכת
+> **🔴 כלל חובה לכל `NEXT_PUBLIC_*`:** `next build` מטמיע אותם **בזמן build**, ו-`env_file: .env` ב-compose הוא runtime בלבד (ו-`.dockerignore` מוציא `.env` מה-build context). לכן כל `NEXT_PUBLIC_*` חדש חייב `ARG`+`ENV` בשלב `build` ב-`Dockerfile` **וגם** `build.args` בשירות `web` ב-`docker-compose.yml`; ושינוי ערך מחייב `docker compose build` ולא רק `up -d`.
+> **התקלה שזה מנע (תוקן 2026-10-05):** `NEXT_PUBLIC_VAPID_PUBLIC_KEY` התקמפל כ-`undefined` בפרודקשן → `<PushNotificationToggle/>` החזיר `null` → כפתור "הפעלת התראות" לא הוצג → אין שורות `PushSubscription` → `sendPushTo*` שתקו. הצד השרתי היה תקין כל הזמן.
 
-השם המוצג למנהל ("היי [שם]") הוא פשוט `User.full_name` של חשבון ה-administrator — **הכניסה/ההתחברות (login) נשארת אחת ויחידה**, אין ריבוי חשבונות admin. כרגע קבוע כ-"יוסי הספר". כדי למסור את המערכת לספר אחר: לשנות את `ADMIN_FULL_NAME` ב-`packages/db/prisma/seed.ts` ולהריץ `pnpm db:seed` (עדכון אידמפוטנטי — `upsert` לפי `phone_number`, מעדכן גם חשבון קיים, לא רק יוצר חדש). זה נפרד לגמרי מזהות ה"ספר" ליומן/הזמנות — ראו "ספרי משנה" למטה: מ-2026-08-03 יש **ריבוי ספרים ברמת היומן** (ישות `Barber` נפרדת מ-`User`), אבל תמיד רק admin אחד מחובר שמנהל את כולם.
+### PWA (2026-08-04, `@serwist/next`)
+- `apps/web/src/app/sw.ts` — מקור ה-service worker (Serwist, לא next-pwa); `next.config.ts` עוטף ב-`withSerwist` ומייצר `public/sw.js` בזמן build (git-ignored). ה-SW מטפל גם ב-`push`/`notificationclick`.
+- רישום בפועל: `<SerwistProvider swUrl="/sw.js" disable={NODE_ENV !== "production"}>` ב-`app/layout.tsx` — Serwist **לא** מזריק סקריפט רישום אוטומטי.
+- `public/site.webmanifest`: ערכי מותג (`theme_color #508186`, `background_color #fdf8f0`, אייקונים 192/512 `any maskable`).
+- `<InstallPrompt/>` — תופס `beforeinstallprompt` ומציג באנר התקנה; ב-iOS (אין `beforeinstallprompt`) מציג הנחיית "שיתוף ← הוסף למסך הבית" מותאמת לדפדפן (ספארי: כפתור בסרגל; כרום/Edge/פיירפוקס ל-iOS: בשורת הכתובת). זיהוי iOS משותף ב-`apps/web/src/lib/ios.ts`, כולל iPadOS 13+ שמזדהה כ-Mac (`maxTouchPoints > 1`) — לא לזהות iOS לפי user agent בלבד במקום אחר. דחייה נשמרת ב-`localStorage`.
+- `color-scheme` מוגדר light-only כדי למנוע היפוך אוטומטי של Android לכהה.
 
-## ישויות עיקריות (ERD)
+### משתני סביבה עיקריים
+ראו `.env.example` (לעולם לא לקרוא `.env` — סעיף 12): `DATABASE_URL`, `SESSION_SECRET`, `COOKIE_SECURE`, `CUSTOMER_LOGIN_MODE`, `SMS_PROVIDER` (+ פרטי 019sms), `YEMOT_PHONE_NUMBER`/`YEMOT_WEBHOOK_SECRET`/`PUBLIC_BASE_URL`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`, `FIGMA_ACCESS_TOKEN`.
 
-`User` (role: customer/administrator) · `Barber` (`is_primary`, `is_active` — ראו "ספרי משנה" למטה) · `PasswordResetCode` · `Service` (duration_minutes, `is_child_service`) · `WorkDay` (`barber_id`, `is_blocked` — ראו למטה) · `WorkBreak` · `BlockedTime` · `Appointment` (status: scheduled/cancelled, attendee_type: self/child/other) · `CancellationRequest` (status: pending/approved/rejected) · `BookingRequest` (status: pending/approved/rejected) · `AppSettings` (סינגלטון, `requires_approval`) · `WaitlistEntry` · `Notification` (type כולל גם `appointment_booked`/`waitlist_slot_available`/`booking_decision`, ו-`read_at`) · `Announcement` · `BlockedPhoneNumber`
+---
 
-הערות מודל חשובות:
-- `Appointment.booked_by_user_id` אופציונלי — תור ידני שהספר קובע יכול להתקיים בלי חשבון משתמש מקושר.
-- אין ישות `Child` נפרדת — פרטי הילד נשמרים ברמת התור (`attendee_name`, `attendee_type`).
-- **שלוש פעולות נפרדות ושונות על תור/יום, אל תתבלבלו ביניהן:** "ביטול תור בודד" (`cancelAppointmentAction`) הוא soft — רק מחליף `status` ל-`cancelled`, הרשומה נשארת. "מחיקת היסטוריה" (`deleteWorkDayAction`/`deleteAllWorkDaysAction`) היא hard delete אמיתי — מחיקה מלאה, לא שמירה בארכיון, מסתמכת על ה-cascade בסכימה. "חסימת יום" (`WorkDay.is_blocked`, `setWorkDayBlockedAction`, 2026-07-26) לא מוחקת ולא מבטלת כלום — רק חוסמת קביעה/שינוי תור **חדשים** של לקוחות לאותו יום; הפיכה לגמרי (טוגל).
-- לכל תור יכולה להיות בקשת ביטול פעילה אחת בו־זמנית, ולכל היותר בקשת תור (`BookingRequest`) אחת (נוצרת רק כשהתור נקבע בזמן שהמדיניות "דורש אישור" דלוקה).
-- `BookingRequest` אינה "כוונה" — ה-`Appointment` הנלווה נוצר מיד עם סטטוס `scheduled` ותופס את השעה ביומן מרגע הבקשה; דחייה משנה את הסטטוס ל-`cancelled` ומשחררת את השעה, אישור לא נוגע בתור כלל.
-- `AppSettings` היא שורה יחידה קבועה (`id = "singleton"`, ראו `settings.ts`'s get-or-create) — לא טבלת key-value כללית; אם יתווספו הגדרות גלובליות נוספות, כנראה עדיף עמודות נוספות לאותה שורה.
-- `WaitlistEntry` כללית במכוון — לא משויכת לתאריך/שעה/שירות ספציפיים; `user_id` הוא `@unique`, אז לקוח יכול להיות ברשימה פעם אחת בלבד (הצטרפות חוזרת = no-op, לא כפילות).
+## 5. מודל נתונים
 
-## שירותים ומשכי זמן (קבועים ב-PRD, לא להמציא ערכים אחרים)
+מקור האמת: `packages/db/prisma/schema.prisma`; תיעוד מלא: `docs/# ERD BarberBook.txt`. שמות שדות snake_case, 1:1 מול ה-ERD.
 
-(בנוסף יש 3 שירותים מוסתרים לתור ידני של הספר בלבד — ראו "קביעת תור ידנית" למטה; לא חלק מהקטלוג ללקוח.)
+**ישויות:** `User` (role: customer/administrator) · `Barber` (`is_primary`, `is_active`) · `Service` (`duration_minutes`, `is_child_service`, `is_manual_only`) · `WorkDay` (`barber_id`, `is_blocked`) · `WorkBreak` · `BlockedTime` · `Appointment` (status: scheduled/cancelled; attendee_type: self/child/other; `booked_via_ivr`) · `CancellationRequest` · `BookingRequest` · `AppSettings` (סינגלטון: `requires_approval`, `ivr_enabled`) · `WaitlistEntry` (`notify_freed_slots`) · `Notification` · `PushSubscription` · `Announcement` · `BlockedPhoneNumber` · `PasswordResetCode` · `LoginCode` · `ContactName`.
 
-| שירות | משך |
-|---|---|
-| תספורת מבוגר | 10 דק' |
-| תספורת + זקן | 15 דק' |
-| תספורת ילד | 10 דק' |
-| הסרת שיער בלייזר | 10 דק' |
-| חלאקה | 15 דק' |
-| תספורת מבוגר + טיפול לייזר | 20 דק' |
+**Migrations (בסדר כרונולוגי):** `init` → `service_name_unique` → `add_is_child_service` → `add_blocked_phone_numbers` → `add_notifications_and_waitlist` → `add_approval_toggle` → `add_work_day_is_blocked` → `add_barbers_table` + `barber_id_required` (2026-08-03) → `add_ivr_enabled` → `add_push_subscriptions_and_notification_types` (09-06) → `add_customer_registered_notification_type` → `add_appointment_booked_via_ivr` → `add_login_codes` (09-22) → `add_contact_names` + `add_manual_only_services` (10-05) → `add_waitlist_notify_freed_slots` (10-06).
 
-## חוקי עסק קריטיים
+### הערות מודל חשובות
+- `Appointment.booked_by_user_id` אופציונלי — תור ידני יכול להתקיים בלי חשבון משתמש.
+- אין ישות `Child` — פרטי הילד ברמת התור (`attendee_name`, `attendee_type`).
+- **שלוש פעולות נפרדות על תור/יום — אל תתבלבלו:**
+  1. **ביטול תור בודד** (`cancelAppointmentAction`) — soft: `status = cancelled`, הרשומה נשארת.
+  2. **מחיקת יום/יומן** (`deleteWorkDayAction`/`deleteAllWorkDaysAction`) — hard delete אמיתי (cascade), לא ארכיון.
+  3. **חסימת יום** (`WorkDay.is_blocked`, `setWorkDayBlockedAction`) — לא מוחקת ולא מבטלת; חוסמת רק קביעה/שינוי **חדשים של לקוחות**; הפיכה (טוגל). שונה גם מ-`BlockedTime` (טווח שעות בתוך יום).
+- לכל תור: בקשת ביטול (`CancellationRequest`) אחת לכל היותר — `appointment_id @unique`, לכן בקשה שנדחתה חוזרת ל-`pending` בבקשה נוספת במקום שורה חדשה; ובקשת תור (`BookingRequest`) אחת לכל היותר.
+- `BookingRequest` אינה "כוונה": ה-`Appointment` נוצר מיד כ-`scheduled` ותופס את השעה; דחייה → `cancelled` ושחרור השעה; אישור לא נוגע בתור. אין `booking_request_id` ב-`Notification` — `booking_decision` מצביעה על `appointment_id`.
+- `AppSettings` — שורה יחידה קבועה (`id = "singleton"`, get-or-create ב-`settings.ts`); הגדרות גלובליות נוספות = עמודות נוספות באותה שורה, לא key-value.
+- `WaitlistEntry` כללית במכוון (לא לפי תאריך/שירות); `user_id @unique` → הצטרפות חוזרת = no-op.
+- `WorkDay`: ייחודיות `[barber_id, work_date]` — שני ספרים יכולים לפתוח את אותו תאריך. `Barber ← WorkDay` הוא `onDelete: Restrict`.
+- `LoginCode` ו-`ContactName` מפתחים לפי **מספר טלפון** ולא `User` (משתמש חדש עדיין לא קיים; איש קשר יכול להיות מספר שטרם נרשם).
+- אין סטטוס "הסתיים" לתור — תור היסטורי נשאר `scheduled` לנצח (ראו הכלל על בדיקת `starts_at >= now` בסעיף 6).
 
-- מוצגות ללקוח רק שעות פנויות בתוך ימי עבודה שהספר פתח — אסור חפיפה בין תורים, ואסור גם שעה שכבר עברה (גם אם היא בתוך יום עבודה פתוח שטרם הסתיים).
-- שינוי תור מותר רק לשעה פנויה שעדיין לא עברה; שולחת הודעה על השינוי.
-- **מדיניות "דורש אישור" (`AppSettings.requires_approval`, ברירת מחדל כבויה) קובעת גלובלית את ההתנהגות של קביעת תור חדש *וגם* של בקשת ביטול:**
-  - דלוקה: קביעת תור נשמרת כ-`BookingRequest` ממתין (התור עצמו כבר תופס את השעה); בקשת ביטול נשמרת כ-`CancellationRequest` ממתינה — בשני המקרים רק החלטת הספר קובעת בפועל.
-  - כבויה: גם קביעת תור וגם בקשת ביטול קורים **מיידית**, בלי המתנה להחלטת הספר.
-  - אל תניחו שביטול/קביעה **תמיד** דורשים אישור מפורש — זה תלוי במתג, בדקו את `getRequiresApproval()`.
-- מחיקת יום/תור דורשת הודעת אזהרה ואישור מפורש לפני ביצוע.
-- איפוס סיסמה — קוד חד־פעמי ב-SMS, לא מייל.
-- הרשאות: מסכי ניהול נגישים רק ל-`administrator`; לקוח לא מחובר לא יכול לערוך תורים.
-- **גישה ל-`/admin` חייבת שתי הגנות בו-זמנית, לעולם לא רק אחת:**
-  1. `apps/web/src/proxy.ts` — רץ ב-edge *לפני* כל קוד עמוד, על כל נתיב תחת `/admin/:path*` (matcher). זו ההגנה שמונעת גישה ע"י הקלדת URL בלבד, גם אם עמוד ספציפי ישכח לבדוק הרשאה.
-  2. `requireAdmin()` (`lib/auth/session.ts`) — נקרא בתוך כל עמוד/`page.tsx` תחת `/admin`.
-  כל נתיב/עמוד ניהול חדש (כולל routes דינמיים כמו `/admin/day/[id]`) **חייב** גם להיכלל תחת ה-matcher ב-`proxy.ts` וגם לקרוא ל-`requireAdmin()` בעצמו — אף אחד מהשניים אינו תחליף לשני. (הערה: Next.js 16 החליף את השם `middleware.ts` ב-`proxy.ts` — קובץ בשם `middleware.ts` יגרום להתנגשות ולקריסת השרת אם `proxy.ts` כבר קיים.)
-- **`COOKIE_SECURE`** (`.env`, ראו `.env.example`) — עוקף את ברירת המחדל (`NODE_ENV === "production"`) לדגל ה-`Secure` של עוגיית הסשן. `next start` תמיד מפעיל `NODE_ENV=production`, וללא HTTPS אמיתי עוגיית `Secure` נזרקת בשקט ע"י הדפדפן — כניסה "לא עובדת" בלי שום שגיאה גלויה. יש להשאיר `COOKIE_SECURE=false` כל עוד משרתים HTTP גולמי (כתובת IP:פורט, בלי דומיין+TLS), ולהסיר/להפוך ל-`true` ברגע שיש HTTPS אמיתי.
+---
 
-## אבטחה — כללים לסוכן הקוד
+## 6. חוקי עסק קריטיים
 
-- **לעולם אל תקרא/תדפיס `.env`/`apps/worker/.env`/`~/.ssh`/`~/.aws`** — נאכף גם ע"י `permissions.deny` וגם ע"י PreToolUse hook חוסם (`.claude/hooks/block-secrets.sh`, `exit 2`) ב-`.claude/settings.json`; זו לא רק בקשה התנהגותית.
-- שאילתות מסד נתונים תמיד דרך Prisma (מפרמט אוטומטית) — לעולם לא `$queryRaw`/`$executeRaw` עם קלט לא-סניטייז.
-- כל mutation שמקבל id צריך לבדוק בעלות/הרשאה בצד השרת לפני נגיעה ברשומה (ראו את דפוס `booked_by_user_id !== session.sub` ב-`booking.ts`/`cancellationRequests.ts`) — אל תסמכו על כך שה-UI לא מציג כפתור.
-- ברירת מחדל תמיד סגורה: פעולת אדמין חדשה חייבת `requireAdmin()`/`requireAdminSession()`, ונתיב `/admin` חדש חייב גם להיכלל ב-matcher של `proxy.ts` (שני השכבות ביחד, לא אחת בלבד — ראו "גישה ל-`/admin`" למעלה).
-- זרימות אימות (login, reset-password) עוברות דרך `apps/web/src/lib/rateLimit.ts` (in-memory, per-process — ראו את ההערה בקובץ על המגבלה בפריסה מרובת-אינסטנסים) — כל endpoint אימות חדש שמנחש credential (סיסמה/קוד) חייב rate limit דומה.
-- אל תדפיסו OTP/סיסמה/טוקן ל-console בקוד חדש — `MockSmsProvider` (`packages/shared/src/sms.ts`) כבר עושה redact כברירת מחדל לקודי OTP.
-- ידוע ופתוח (לא תוקן, דורש החלטה אדריכלית): אין revocation לסשן קיים בעת reset סיסמה — JWT stateless. אל תניחו שסשן "מבוטל" אחרי reset.
-- **סשן "זכור אותי" (sliding session, נוסף 2026-08-09):** עוגיית הסשן אינה 30 יום קבועים מרגע ההתחברות — `proxy.ts` מרעננת אותה (חותמת טוקן חדש עם `iat`/`exp` חדשים, `signSession`) בכל בקשה מאומתת ל-`/account/*`/`/admin/*`, כך שהחלון מתחדש ל-30 יום נוספים מכל ביקור פעיל. המשמעות: לקוח/אדמין פעיל (חוזר לפחות פעם ב-30 יום) לא מתנתק לעולם עקב חלוף זמן קלנדרי — רק חוסר פעילות אמיתי מעבר ל-30 יום או logout מפורש. `cookieSecure()` הועבר מ-`session.ts` ל-`jwt.ts` (edge-safe, בלי `server-only`/`next/headers`) כדי ש-`proxy.ts` (edge middleware) יוכל להשתמש בו גם כן. שימו לב: זה מגביר את המשמעות המעשית של הפסקה הקודמת — טוקן שממשיך "לחיות" (מוצג לפחות פעם ב-30 יום, כולל טוקן לפני reset סיסמה שלא בוטל) הופך בפועל לבלתי-מוגבל בזמן, לא רק ל-30 יום מקסימום.
+- **זמינות:** ללקוח מוצגות רק שעות פנויות בתוך ימי עבודה שהספר פתח. אסור חפיפה בין תורים, ואסורה שעה שכבר עברה (גם בתוך יום פתוח שטרם הסתיים).
+  - `findAvailableSlots`/`isSlotAvailable` (`apps/web/src/lib/availability.ts`): רשת קבועה של 10 דקות מתחילת היום, מתיישרת מחדש בדיוק לסוף כל תור/הפסקה/חסימה (בלי מרווח) — כדי לא להציג שתי אפשרויות בפער קטן מ-10 דק'. פונקציות **טהורות ודטרמיניסטיות**; סינון "שעה שעברה" רק בשכבת ה-action.
+  - **חסימת שעות שעברו (FR-28):** `getSlotsForDate` מסננת `d < now`; `bookAppointmentAction`/`rescheduleAppointmentAction` בודקות שוב בתוך הטרנזקציה (`PAST_SLOT`) כרשת ביטחון.
+- **שינוי תור** מותר רק לשעה פנויה שעוד לא עברה; שולח הודעה. אפשר לעבור לספר אחר אם הוא מציע את שירות התור (`SERVICE_NOT_OFFERED` נאכף בשרת).
+- **מדיניות "דורש אישור"** (`AppSettings.requires_approval`, ברירת מחדל כבויה) קובעת גלובלית את קביעת תור חדש **וגם** בקשת ביטול:
+  - דלוקה: קביעה נשמרת כ-`BookingRequest` ממתין (התור כבר תופס את השעה); ביטול נשמר כ-`CancellationRequest` ממתינה — רק החלטת הספר קובעת.
+  - כבויה: שניהם קורים **מיידית**. אל תניחו שביטול/קביעה תמיד דורשים אישור — בדקו `getRequiresApproval()`.
+- **חסימת יום** נאכפת בשלוש שכבות: `getOpenDates()` (לא מציגה), `bookAppointmentAction`/`rescheduleAppointmentAction` (זורקות `DAY_BLOCKED`). לא חל על קביעה ידנית של הספר.
+- **חסימת מספרי טלפון** (`BlockedPhoneNumber`) נאכפת בהרשמה, בכניסה (שליחת קוד ואימות), בקביעה ובשינוי תור — גם למספרים שטרם נרשמו.
+- **הודעת ביטול על תור — תמיד לבדוק `starts_at >= new Date()`** ולא רק `status === "scheduled"` (תקלה אמיתית שתוקנה ב-`deleteWorkDayAction`/`deleteAllWorkDaysAction`/`cancelAppointmentAction`: תור היסטורי עלול לגרום להודעת "בוטל" מטעה).
+- מחיקת יום/תור דורשת הודעת אזהרה ואישור מפורש.
+- איפוס סיסמה — קוד חד-פעמי ב-SMS, לא מייל (רלוונטי רק במצב `password`).
+- הרשאות: מסכי ניהול רק ל-`administrator`; לקוח לא מחובר לא יכול לערוך תורים. `account/appointments` מסנן `starts_at >= now` — הלקוח לא רואה תורי עבר.
 
-## עיצוב (Design System)
+---
 
-מסמכי מקור: אין קובץ עיצוב נפרד — הכללים כאן הם המקור היחיד. הבסיס נקבע בשיחה עם המשתמשת ב-2026-07-19; **ב-2026-07-21 נוסף ערכת נושא בהירה חדשה למסכי הלקוח**, מבוססת על קובץ פיגמה שהמשתמשת בנתה ("Hair Salon | Barber Shop | Salon | App UI Design Template (Community)" — תבנית קהילתית שהיא התאימה עם לוגו "Yossi Barber" אמיתי; שאר התוכן בה היה placeholder ולא הועתק כמות שהוא).
+## 7. פיצ'רים — צד לקוח
 
-**ב-2026-07-25 האפליקציה אוחדה לערכת נושא בהירה אחת גלובלית** — עד אז `/admin` היה על ערכת נושא כהה נפרדת ומכוונת (תועד כאן בעבר כ"שתי ערכות נושא במקביל, לא אחת שהוחלפה"); זה בוטל. הסיבה: לוגו חדש שהמשתמשת סיפקה (ראו "לוגו" למטה) מבוסס שחור+זהב על רקע בהיר, ולא היה קריא על הרקע הכהה של `/admin` — ובמקום לתחזק שתי ערכות נפרדות רק כדי לפתור את זה, כל `/admin` עבר לאותה ערכת נושא בהירה שכבר הייתה קיימת במסכי הלקוח (ראו "פלטת צבעים" למטה). טוקני הצבע הכהים (`prussian-blue`/`space-indigo`/`dusk-blue`/`tropical-teal`/`neon-ice`) הוסרו לגמרי מ-`globals.css` ומכל הקוד.
+### קביעת תור (`account/book`)
+זרימה: **ספר** (מדולג אוטומטית אם יש רק ספר פעיל אחד) ← **שירות** (שירות ילד → שם ילד, ללא צ'ק-בוקס) ← **תאריך** ← **שעה** ← **סיכום** ← אישור.
+- הכל מסונן דרך `getOpenDates(barber_id)`/`getServices(barber_id)`.
+- **מ-2026-10-05, בחירת שעה לא קובעת מיד:** צעד `summary` מציג כרטיס "סיכום פרטי התור" (ספר, שירות, ילד, תאריך, שעה — בעיצוב גרדיאנט כמו כרטיסי ההודעות ב-`/account`, שורות `תווית: ערך` ב-RTL) עם "אישור" (רק הוא קורא ל-`bookAppointmentAction`) ו"ביטול" (חזרה להתחלה, `bookAnother`). אפשר לקבוע תור נוסף באותה זרימה.
+- **מצב "אין ימים פתוחים":** מנוסח "התרע/י לי כשייפתחו תאריכים לקביעת תורים" — אותו מנגנון רשימת המתנה, ניסוח ממוקד.
+- כשהמדיניות דלוקה: מסך "הבקשה שלך נשלחה לאישור הספר" (`pendingApproval: true`).
 
-**היחיד שנשאר בהיר-מסיבה-נפרדת ולא קשור למיתוג:** עמודי הדפסה/ייצוא (`admin/day/[id]/print`, `admin/print-all`) — נשארים `bg-white`/`text-gray-*` פשוטים, לא טוקני `cream`/`barber-teal`, כי הם מיועדים להדפסה/PDF בפועל ולא חלק מהעיצוב הממותג.
+### ניהול תורים (`account/appointments`)
+- **שינוי מועד** (`RescheduleButton`) — לשעה פנויה בלבד; מותר גם לספר אחר.
+- **ביטול:** כשהמדיניות דלוקה — `RequestCancellationButton` שולח `CancellationRequest` (הספר מאשר/דוחה; רק אישור מבטל בפועל, דחייה משאירה את התור; ההחלטה → הודעה `cancellation_decision`). כשכבויה — `requestCancellationAction` מבטלת **מיידית** בלי ליצור `CancellationRequest`.
+- **גם בזמן ההמתנה לאישור תור** (מ-2026-10-05) הלקוח יכול לשנות מועד או לבטל: שינוי מועד משאיר את ה-`BookingRequest` ב-`pending` לשעה החדשה (הספר מקבל התראה "עדיין ממתין לאישורך"); ביטול מיידי בלי אישור ספר — `requestCancellationAction` **מוחקת** את ה-`BookingRequest` (`deleteMany` מותנה ב-`pending`; אין סטטוס `withdrawn`) ומבטלת את התור. `decideBookingRequest` משתמשת ב-`updateMany` מותנה ב-`pending` כדי לא לקרוס אם הלקוח ביטל באותו רגע.
 
-### חיבור לפיגמה
+### דף הבית (`/account`)
+הודעות כלליות של הספר (חדשה קודם), תיבת רשימת המתנה (כולל `LeaveWaitlistButton` ומתג `FreedSlotNotifyToggle`), הפעלת Push (`<PushNotificationToggle audience="customer"/>`).
+- **הודעות כלליות** (`Announcement`, US-009): מפורסמות ב-`/admin/announcements`; תצוגה באפליקציה + Push לכל מנויי הלקוחות (בלי שורת `Notification`, בלי SMS; ללא Push על עריכה/מחיקה). כרטיס ההודעה: `bg-gradient-to-bl from-barber-teal to-cream`, טקסט `text-ink` (לבן נעלם על הקצה הבהיר).
 
-- טוקן API אישי שמור ב-`.env` בתור `FIGMA_ACCESS_TOKEN` (לא ב-git). קובץ הייחוס: file key `RLOrFLhV7pQErRxAUiA3do`.
-- משיכת מסכים: `GET https://api.figma.com/v1/files/{key}?depth=2` לרשימת frames, ואז `GET https://api.figma.com/v1/images/{key}?ids=<node-ids>&format=png` לתמונות. אין סקריפט קבוע לזה עדיין — נעשה אד-הוק דרך `curl` בשיחה מ-2026-07-21; אם זה יקרה שוב בתדירות, שווה להפוך לסקריפט ב-`scripts/`.
+### רשימת המתנה (US-022..US-025, `waitlist.ts`)
+כללית, לא לפי תאריך/שירות. צד לקוח: `joinWaitlistAction`/`leaveWaitlistAction`/`isOnWaitlist`/`getMyWaitlistEntry`/`setNotifyFreedSlotsAction`. צד ספר: `getWaitlistEntries`/`removeWaitlistEntryAction` (`/admin/waitlist`; הסרה ידנית בלי הודעה ללקוח). פירוט הטריגרים — סעיף 9.
 
-### לוגו
+### לוח שנה — שני מימושים נפרדים
+- **לקוח** (`DateCalendar` בתוך `account/book/page.tsx`): רשת חודשית RTL (יום ראשון מימין); רק תאריכים מ-`getOpenDates()` לחיצים (עיגול טורקיז), השאר דהויים; ניווט חודשים רק בין חודשים שיש בהם תאריך פתוח. שעות פנויות — כפתורי פיל `rounded-full`.
+- **אדמין** (`AdminDateCalendar` ב-`admin/OpenWorkDayForm.tsx`): אותו עיצוב, **לוגיקה הפוכה** — כל תאריך עתידי לחיץ, חוץ מעבר ותאריכים שכבר קיימים כיום פתוח; ניווט חופשי קדימה, חסום אחורה מהחודש הנוכחי. **תבנית UI לשימוש חוזר:** שדה קומפקטי (נראה כ-`<input>`, מציג התאריך או "בחרו תאריך") שבלחיצה פותח את הלוח כפופאפ מתחתיו (`calendarOpen`); בחירה סוגרת אותו.
 
-**היסטוריה (חשוב להבין כדי לא להתבלבל בין גרסאות ישנות בקוד/מסמכים ישנים):** היה לוגו ישן (`logo.svg`, JPEG עטוף ב-SVG, קומפוננטת `<Logo/>`) שהוצג בתחתית העמוד בתוך תיבה ממוסגרת. ב-2026-07-25 המשתמשת סיפקה לוגו חדש (`~/winmux-drops/new logo1.svg` — קובץ Figma שכלל את האמנות **וגם** רקע גרדיאנט אפוי-בפנים + מסגרת). אחרי כמה סבבי איטרציה (ראו היסטוריית git אם צריך את הפרטים), המצב הנוכחי (2026-07-26) הוא:
+---
 
-- **קובץ אחד משותף לכל האפליקציה:** `apps/web/public/logo-cropped.png` — האמנות בלבד, רקע שקוף (alpha אמיתי). זה **הלוגו היחיד** שקיים כרגע בקוד — `logo.svg` הישן, קומפוננטת `<Logo/>`, `admin-logo.svg` (הגרסה המרובעת עם הגרדיאנט אפוי-בפנים) ו-`admin-logo-cropped.svg`/`admin-logo-cropped.svg` (שמות ביניים, **SVG**) **נמחקו כולם**.
-  - **למה PNG ולא SVG (תקלה אמיתית, תוקנה 2026-07-26):** הגרסה המקורית של `new logo1.svg` (וכל הגזירות שלה) השתמשה ב-`<mask>`/`<pattern>`/`<image>` מקוננים כדי לדמות רקע שקוף — זה נראה תקין ב-Chromium שולחני (הכלי היחיד שהיה זמין לאימות בסביבת הפיתוח), אבל המשתמשת דיווחה שהלוגו **לא מופיע בכלל** בדפדפן נייד אמיתי — הסימפטום הקלאסי של mask/pattern SVG מורכב שלא נתמך אחיד בין מנועי רינדור (בפרט WebKit/מובייל Safari). הפתרון: רינדור חד-פעמי של ה-SVG ברזולוציה כפולה עם alpha אמיתי, ושטיחה ל-PNG שקוף רגיל — נתמך זהה בכל דפדפן, בלי תלות ביכולות mask. **אם הלוגו צריך להשתנות אי-פעם, ליצור PNG חדש באותה שיטה (רינדור+שטיחה) מתוך קובץ המקור — לא לחזור ל-SVG מבוסס mask, ולא לערוך את ה-PNG ידנית.**
-- **מוצג דרך שני קומפוננטים כמעט-זהים (לא אוחדו לאחד, כי הם חיים בשני חלקים שונים של העץ):**
-  - **מסכי לקוח** — `<BrandHero />` (`apps/web/src/components/BrandHero.tsx`).
-  - **`/admin`** — `<AdminBrandHero />` (`apps/web/src/components/AdminBrandHero.tsx`), מוזרם דרך ה-`topBanner` prop של `<PageHeader/>` (ראו למטה) — לא מוכנס ישירות ב-JSX של כל עמוד.
-  - שניהם: גרדיאנט `from-barber-teal/50 to-cream` (טורקיז למעלה, נמס לקרם למטה — נבנה ב-Tailwind, לא חלק מהקובץ), `-mx-6` לפריסה מלאה לרוחב, **בלי** תיבה/מסגרת סביב הלוגו (רק התמונה עצמה על הגרדיאנט), גובה קבוע `90px` ורוחב `auto`.
-- **מיקום: בראש העמוד** (לא בתחתית — שונה מהעיצוב המקורי מ-2026-07-21/25) — מיד אחרי `<BsdBar/>` ולפני הכותרת/תוכן העמוד. אצל הלקוח מוכנס ידנית ב-JSX (`<BsdBar/>` ואז `<BrandHero/>` ואז ה-`<h1>`); ב-`/admin` מוכנס אוטומטית על ידי `<PageHeader topBanner={<AdminBrandHero/>} title=.../>` (ראו הסבר `PageHeader` למטה) — **אין** יותר `mt-auto`/מיקום בתחתית, וממילא `flex flex-col` על ה-`<main>` כבר לא קריטי לצורך הזה (נשאר בכל זאת כמוסכמת layout).
-- כל עמוד לקוח חדש **חייב** לכלול `<BrandHero />` מיד אחרי `<BsdBar/>`. כל עמוד `/admin` חדש **חייב** להעביר `topBanner={<AdminBrandHero/>}` ל-`<PageHeader/>`.
+## 8. פיצ'רים — צד ספר (`/admin`)
 
-### "בס"ד" — `BsdBar` (כל האפליקציה)
+כל המסכים תחת `requireAdmin()` + matcher ב-`proxy.ts` (סעיף 12).
 
-בכל עמוד באפליקציה (מסכי לקוח **וגם** `/admin`), "בס"ד" מוצג דרך `<BsdBar />` (`apps/web/src/components/BsdBar.tsx`) — רכיב אחד משותף, לא כפול. ממוקם כילד ראשון תחת ה-`<main>`, `sticky top-0`, כך שנשאר גלוי תמיד גם בגלילה, מעל שאר התוכן. שובר את ה-`p-6` של ה-`<main>` עם `-mx-6 -mt-6` כדי להיצמד לרוחב וגובה מלאים. כל עמוד לקוח חדש **חייב** לכלול אותו כילד הראשון תחת ה-`<main>` (ואז `<BrandHero/>` מיד אחריו, ראו למעלה). ב-`/admin` הוא מגיע דרך `<PageHeader title?: string; topBanner?: ReactNode />` (`apps/web/src/components/PageHeader.tsx`), שמחזיר `<><BsdBar/>{topBanner}{title && <h1>...</h1>}</>` כ-fragment (לא עטוף ב-`div` נוסף) — כדי שה-`-mx-6 -mt-6` של `BsdBar` יעבוד נכון גם כש-`PageHeader` הוא הילד הראשון תחת ה-`<main>` של עמוד `/admin`. ה-`topBanner` הוא סלוט אופציונלי בין `BsdBar` לכותרת — כרגע כל 9 עמודי ה-`/admin` מעבירים `<AdminBrandHero/>`.
+### מסך ראשי (עוצב מחדש 2026-09-21)
+- **תפריט** (`AdminMenu`): לקוחות חסומים · רשימת המתנה · הודעות כלליות · הגדרות · ניהול ספרים · אנשי קשר. **שלושה כפתורים גדולים מוערמים** (`w-64 mx-auto`) עם badge ספירה: בקשות תורים · בקשות ביטול · התראות.
+- **"היום הרלוונטי":** `getWorkDaysAdmin` מסנן לפי `ends_at >= now()` (לא לפי תאריך בלבד) — יום ששעותיו הסתיימו נעלם מהתצוגה המהירה וגם מרשימת "ימי עבודה פתוחים" (לא נמחק מה-DB). `workDays[0]` = היום הפתוח האמיתי הבא.
+- **`QuickDayAppointments`** (`admin/QuickDayAppointments.tsx`) — רכיב משותף למסך הראשי ול-`/admin/day/[id]` (עם `showMoveButton`): ציר זמן (`buildDayTimeline`) עם "ביטול תור" לכל תור ו"קביעת תור ידני" לכל שעה פנויה (פותח `CreateManualAppointmentForm` inline עם `initialStartsAt`/`onCancel`). **מ-2026-10-05 טווחים פנויים מפוצלים לשעות בודדות** (`splitFreeSegments`, רשת 10 דקות כמו אצל לקוח, כל שעה מוצגת בזמן ההתחלה שלה).
+- כפתורי פעולה קטנים אחידים: `bg-barber-teal text-cream-text rounded-full px-3 py-1 text-xs font-medium`. שעה פנויה: `text-ink font-bold` עם המילה "פנוי" בלבד באדום (`text-red-600`).
+- `DeleteAllWorkDaysButton` באותה שורה עם "תפריט", אותו מידות, באדום.
 
-### פלטת צבעים (אפליקציה כולה, 2026-07-21, מפיגמה)
+### ימי עבודה
+- פתיחת יום (תאריך, שעות, הפסקות דינמיות); **עדכון שעות** של יום פתוח (נחסם אם יש תור/הפסקה/חסימה מחוץ לטווח החדש); צפייה בתורי יום (`/admin/day/[id]`).
+- **העברת תור** (`MoveAppointmentButton`) לשעה אחרת באותו יום — `Notification`+Push (בלי SMS) ללקוח עם חשבון (תור ידני ללא חשבון מועבר בלי הודעה).
+- **ביטול תור בודד** (`CancelAppointmentButton`, US-017) — שולח `Notification`+Push ללקוח מקושר, ומפעיל התראת רשימת המתנה אם השעה עתידית.
+- **מחיקת יום/כל היומן** (US-012) — עם עותק הדפסה/PDF אופציונלי לפני (`/admin/day/[id]/print`, `/admin/print-all`) והודעת ביטול לכל לקוח עם תור פעיל עתידי בטווח.
+- **חסימת יום** (`BlockDayToggle`, שתי גרסאות — מלאה עם הסבר ב-`/admin/day/[id]`, `compact` מתחת ל"ניהול היום" בכל שורה ברשימה; שתיהן קוראות ל-`setWorkDayBlockedAction`) + badge "חסום".
+- עמודי הדפסה/ייצוא נשארים `bg-white`/`text-gray-*` פשוטים בכוונה (עיצוב להדפסה, לא ממותג).
 
+### קביעת תור ידני
+**ללא בחירת שירות** (מ-2026-10-05): הספר בוחר שם (בלי טלפון) + משך (5/10/15 דק', `MANUAL_APPOINTMENT_DURATIONS`). כל משך ממופה לשירות מוסתר (`Service.is_manual_only`, נוצרים ב-migration `add_manual_only_services` וב-seed) כדי ש-`Appointment.service_id` יישאר חובה וכל חישובי המשך/העברה יעבדו. `getServices` מסנן אותם; `bookAppointmentCore` דוחה אותם כרשת ביטחון. תור ידני אינו מפעיל התראת מנהל.
+
+### בקשות, הגדרות וחסימות
+- **בקשות תורים** (`/admin/booking-requests`, US-019/US-020): אישור לא נוגע בתור; דחייה → `cancelled` + `notifyWaitlistOfFreedSlot` (אם עתידית) + `booking_decision` ללקוח. badge: `getPendingBookingRequestCount()`.
+- **בקשות ביטול** (`/admin/cancellation-requests`, US-008).
+- **הגדרות** (`/admin/settings`): `ApprovalToggle` (`requires_approval`), `IvrToggle` (`ivr_enabled`).
+- **לקוחות חסומים** (`/admin/blocked-customers`, US-014).
+- **הודעות כלליות** (`/admin/announcements`).
+
+### ספרי משנה (`Barber`, 2026-08-03; `/admin/barbers`)
+- הספר (ה-admin היחיד) מוסיף ספרים עובדים: **שם בלבד, בלי login נפרד** — `Barber` הוא "שם + יומן", לא `User`. לכל ספר `WorkDay` נפרד.
+- `Barber.is_primary` = הספר המקורי (`id: "primary"` מה-seed) שמציע את כל 6 השירותים; ספר-משנה מוגבל ל-3 קבועים — `SUB_BARBER_SERVICE_NAMES` (לא ניתן להגדרה פר-ספר; `isServiceAllowedForBarber`).
+- **השבתה** (`is_active`, `setBarberActiveAction`) מסתירה מבוררי הלקוח ושומרת את היומן נגיש לאדמין (`/admin?barber=<id>`). **מחיקה** (`deleteBarberAction`, `DeleteBarberButton`) — hard delete: מוחקת את כל ימי העבודה של הספר (עם אפשרות להודיע ללקוחות על תורים עתידיים) ואז את ה-`Barber`, בטרנזקציה. **הספר הראשי לא ניתן להשבתה ולא למחיקה.**
+- `WaitlistEntry` ו-`AppSettings.requires_approval` **אינם** מודעים-לספר — נשארו גלובליים בכוונה.
+
+### אנשי קשר (`ContactName`, 2026-10-05; `/admin/contacts`)
+הספר רואה כל לקוח **לפי השם ששמור אצלו בטלפון** (נופל לשם שהלקוח נרשם איתו), עם מספר הטלפון וכפתורי חיוג/SMS/וואטסאפ — בכל מסכי `/admin` (תורי יום, בקשות תורים/ביטול, רשימת המתנה, חסומים, ייצוא יום).
+- **רכיבים:** `CustomerContact` + `ContactActions` (`components/CustomerContact.tsx`, כולל ✎ לעריכה ידנית), `getContactNameMap` (`lib/contactNames.ts`, server-only), `lib/contacts.ts` (`normalizeIsraeliPhone`, `whatsappUrl`, `parseVCards` — קורא .vcf כולל שורות מקופלות ו-QUOTED-PRINTABLE של עברית), `lib/actions/contacts.ts`.
+- **שלושה מקורות (`ContactNameSource`):** `import` (ייבוא .vcf — מסונן בדפדפן מול `getKnownCustomerPhones()`, כך שרק לקוחות/חסומים קיימים נשלחים לשרת), `picker` (Android Contact Picker — נשמר גם למספר שטרם נרשם, ודורס), `manual` (עריכה ידנית). **ייבוא חוזר לעולם לא דורס שורת `manual`.** שם ריק מוחק (חזרה לשם הרשום).
+- חשיפת הטלפון בייצוא/הדפסה: ראו הערת IVR בסעיף 11 — בהדפסות לא נחשף.
+
+---
+
+## 9. התראות (In-app, Push, SMS)
+
+### שלושה ערוצים נפרדים
+1. **In-app** — `Notification` (פיד + badge). `sendCustomerNotification` (`lib/notifyCustomer.ts`) היא **המקום היחיד שכותב `Notification` ללקוח** ושולחת גם Push; `appointment_id`/`cancellation_request_id` נשארים `null` במחיקה קשה.
+2. **Web Push אמיתי** (`web-push`, מ-2026-09-06 למנהל, מ-2026-09-21/22 גם ללקוחות) — מציג התראת מכשיר גם כשהאפליקציה סגורה.
+3. **SMS** — **התראות (ביטול/שינוי/תזכורת) נשארות בלי SMS** (עולה כסף). SMS נשלח רק לקודי כניסה, דרך `getOtpSmsProvider()` (נפרד מ-`getSmsProvider()` שנשאר Noop).
+
+### מנגנון Push
+- מודל `PushSubscription` (`user_id`, `endpoint` ייחודי, `p256dh`/`auth`) — מכשיר אחד לשורה; תקרת 10 מכשירים למשתמש; `subscribeToPushAction` פתוחה לכל משתמש מחובר, עם אימות `endpoint` מול allowlist של שירותי push אמיתיים (`lib/pushEndpoint.ts` — מונע SSRF).
+- **קוד השליחה ב-`packages/db/src/push.ts`** (`sendPushToAdmins`/`sendPushToUser`/`sendPushToCustomers`, מיוצאים מ-`@barberbook/db`) כדי ש-web וגם worker ישתמשו באותו קוד. הפונקציות **לא זורקות לעולם**, no-op שקטה בלי VAPID, ורושמות `[push] delivery failed <status>` לכשל שאינו 404/410. `prisma` ב-`packages/db/src/client.ts` (מניעת import מעגלי).
+- `<PushNotificationToggle audience="customer" | admin/>` ב-`/account` וב-`/admin/notifications`; ב-iOS נדרשת התקנה למסך הבית לפני ש-Web Push עובד (Android/Desktop לא).
+- ה-worker צריך את `VAPID_*` ב-`apps/worker/.env` (ב-Docker `env_file` משותף).
+
+### התראות לספר (`notifyAdmin.ts`, helper אחד `notifyAdmins`)
+תור חדש (אתר + IVR) · בקשת תור ממתינה · בקשת ביטול ממתינה · שינוי מועד ע"י לקוח (`notifyAdminsOfCustomerReschedule`) · ביטול מיידי ע"י לקוח כשהמדיניות כבויה (`notifyAdminsOfCustomerCancellation`) · לקוח חדש (`notifyAdminsOfNewCustomer` → `customer_registered`, נקרא מ-`registerUserCore` ולכן מכסה גם הרשמה בטלפון).
+- `NotificationType`: `appointment_reminder`, `appointment_changed`, `cancellation_decision`, `appointment_booked`, `waitlist_slot_available`, `booking_decision`, `booking_request_pending`, `cancellation_request_pending`, `customer_registered`.
+- כשהמדיניות כבויה כל תור שלקוח קובע יוצר `appointment_booked` לכל מנהל (תור ידני — לא). badge ב-`/admin` סופר `read_at IS NULL`; `markAdminNotificationsReadAction` = "סמן הכל כנקרא" (`updateMany`), אין סימון פר-שורה. `adminNotifications.ts` מסנן לפי `ADMIN_NOTIFICATION_TYPES` (באג שתוקן: בעבר סינן רק `appointment_booked` ולכן בקשות ממתינות לא הופיעו).
+
+### התראות ללקוח
+שינוי/ביטול תור ע"י הספר (כולל מחיקת יום/יומן/ספר) · החלטה על בקשת תור/ביטול · רשימת המתנה · **תזכורת לפני תור** (worker, `reminders.ts`: כל דקה, תורים `scheduled` עם חשבון שמתחילים בתוך `APPOINTMENT_REMINDER_LEAD_MINUTES` = 120 דק' וללא `Notification` מסוג `appointment_reminder` — האידמפוטנטיות מסתמכת רק על הבדיקה הזו; Notification+Push).
+
+### רשימת המתנה — שלושה טריגרים (`notifyAllWaitlistEntries`, `type: waitlist_slot_available`)
+1. **`notifyWaitlistOfFreedSlot(starts_at, service, owner_user_id)`** — תור עתידי שהתפנה: ביטול ישיר ע"י הספר, אישור/ביטול מיידי של בקשת ביטול, דחיית בקשת תור, **וגם העברת תור (ע"י לקוח או ספר) — השעה הישנה שהתפנתה** (נוסף 2026-10-05, commit `542d4e0`; מותנה בכך שהשעה הישנה עתידית ושונתה בפועל; כשל התראה נרשם בלוג ולא מכשיל את ההעברה). בעל התור מוחרג. **נשלח רק לחברי הרשימה שהשאירו דלוק `WaitlistEntry.notify_freed_slots`** (ברירת מחדל `true`; מתג "התראה כשמתפנה תור" ב-`/account`, `FreedSlotNotifyToggle`) — **שונה 2026-10-06**: עד אז נשלח גם לכל לקוח עם Push, וזה בוטל.
+2. **`notifyWaitlistOfExtendedHours`** — `updateWorkDayHoursAction` **מרחיבה** יום פתוח.
+3. **`notifyWaitlistOfNewWorkDay`** — `createWorkDayAction` פותחת יום חדש לגמרי (תוקן 2026-07-26: בלעדיו לקוח שהצטרף כשאין אף יום פתוח לא קיבל התראה).
+
+המתג `notify_freed_slots` חל **רק** על תור שהתפנה; יום חדש/הרחבת שעות נשלחים לכל הרשימה (זו הסיבה להיות בה). הצטרפות/עזיבת רשימה לא מודיעה לספר.
+
+---
+
+## 10. כניסה והתחברות
+
+### שני מצבים (`CUSTOMER_LOGIN_MODE`, `lib/loginMode.ts`, `isSmsLoginEnabled()`)
+| מצב | מתי | חוויה |
+|---|---|---|
+| `password` (ברירת מחדל בקוד) | משתנה לא מוגדר/אחר, או אין ספק SMS תקף | הרשמה/כניסה ישנות: שם + טלפון + סיסמה; איפוס סיסמה (SMS מדומה) |
+| `sms_code` (**חי בשרת הפיתוח**) | `CUSTOMER_LOGIN_MODE="sms_code"` **וגם** `SMS_PROVIDER` הוא `019` או `mock` | טלפון → קוד 6 ספרות ב-SMS → (מספר חדש בלבד) שם מלא → כניסה |
+
+הדלקת הדגל בלי ספק תקף **לא** מפעילה את המצב (מונע נעילת לקוחות בחוץ). **`/login` הוא `force-dynamic`** (הצורה תלויה ב-env בזמן ריצה).
+
+### מצב `sms_code`
+- זרימה: `smsLoginAction` (`lib/actions/smsLogin.ts`, שלבים `send`/`verify`/`signup`); לוגיקת הקודים ב-`lib/smsLoginCore.ts` (לא `"use server"`); UI ב-`login/SmsLoginForm.tsx`.
+- קודים: `randomInt`, נשמר רק HMAC-SHA256 עם `SESSION_SECRET` בטבלה `login_codes`, חד-פעמי, תוקף `LOGIN_CODE_TTL_MINUTES` (10), `LOGIN_CODE_MAX_ATTEMPTS` (5) ואז נעילה, קוד חדש מבטל ישנים. ה-SMS מציב את **הקוד בתחילת ההודעה** כדי שיופיע בבאנר ההתראה.
+- מספר חדש עובר לשלב שם עם **הוכחה חתומה** (JWT 10 דק') — העובדה "המספר הזה הוא/לא לקוח" לא נחשפת לפני שהוכח שהמספר שלו. נוצר `User` עם סיסמה אקראית לא-שמישה (כמו לקוחות IVR) + התראת "לקוח חדש" לספר.
+- מגבלות קצב (`rateLimit.ts`, in-memory): שליחה — 3 ל-15 דק' למספר, 10 לשעה ל-IP, **100 לשעה גלובלית** (תקרת עלות מול SMS-pumping); אימות — 10 ל-15 דק' למספר.
+- נסגר במצב זה: `/register`, `/forgot-password`, `/reset-password` מפנים ל-`/login` (ב-`proxy.ts`) וה-actions מסרבות גם בקריאה ישירה; `loginAction` מקבלת רק מנהל; `/admin` ללא סשן מפנה ל-`/login/admin`.
+- ה-worker מוחק קודים שפג תוקפם מעל יממה (cron יומי 03:17, `cleanup.ts`).
+- **ספק:** `Sms019Provider` (`packages/shared/src/sms019.ts`; `POST https://019sms.co.il/api`, Bearer token, `source` עד 11 תווים, מאושר `BarberBook`); ימות המשיח נפסל (אין endpoint נקי ל-SMS בודד). החלפת ספק = מימוש `SmsProvider` + `case` ב-`getOtpSmsProvider()`.
+
+### המנהל — תמיד עם סיסמה
+`/login/admin` קיים בשני המצבים; מספר המנהל פשוט/ידוע ולכן **אסור** לאפשר לו כניסה בקוד/טלפון בלבד. למספר מנהל, שלב ה"שליחה" מדמה הצלחה בלי לשלוח וליצור קוד.
+
+### סשן "זכור אותי" (sliding, 2026-08-09)
+`proxy.ts` מרעננת את עוגיית הסשן (`signSession` עם `iat`/`exp` חדשים) בכל בקשה מאומתת ל-`/account/*`/`/admin/*` — חלון 30 יום מתחדש מכל ביקור; רק חוסר פעילות מעל 30 יום או logout מפורש מנתקים. `cookieSecure()` ב-`jwt.ts` (edge-safe, בלי `server-only`) כדי ש-`proxy.ts` ישתמש בו.
+**`COOKIE_SECURE`** (`.env`) עוקף את ברירת המחדל (`NODE_ENV === "production"`) לדגל `Secure`: `next start` תמיד production, וללא HTTPS אמיתי הדפדפן זורק בשקט עוגיית `Secure` — כניסה "לא עובדת" בלי שגיאה. להשאיר `false` כל עוד HTTP גולמי (IP:פורט), ו-`true`/ללא משתנה כשיש HTTPS.
+
+---
+
+## 11. קביעת תור טלפונית (IVR)
+
+ספק: **ימות המשיח** (הוחלף מ-Twilio ב-2026-08-04 — Twilio לא מציע מספרים ישראליים). קו `0772248273`. מסמך מלא: `docs/# IVR BarberBook.txt`.
+
+### ארכיטקטורה
+- לוגיקת עסק תלוית-ספק-אפס, משותפת עם האפליקציה: `bookAppointmentCore` (`lib/actions/bookingCore.ts`), `registerUserCore` (`registerCore.ts`), מכונת מצבים של השיחה ב-`lib/ivr/flow.ts` (`startCall`/`continueCall`, `CallState`).
+- שכבת ימות: `lib/ivr/yemotResponse.ts` (מחרוזת פקודות טקסטואלית, לא XML), `verifyWebhookSecret.ts` (אין חתימה כמו Twilio — האבטחה היא **סוד ב-URL**, החלטה #17 במסמך), `identifyCaller.ts`, `bookViaPhone.ts`, `callState.ts`, `publicUrl.ts`, ו-route יחיד `app/api/ivr/yemot/[secret]/route.ts`.
+- סביבה: `YEMOT_PHONE_NUMBER`/`YEMOT_WEBHOOK_SECRET`/`PUBLIC_BASE_URL` (בבדיקות דרך דומיין ngrok סטטי עד שיירכש דומיין).
+
+### פרטי תחביר שאומתו בשיחה אמיתית (2026-08-08)
+בקשות **GET** (לא POST); `ApiPhone` בפורמט **מקומי**; `read=` לזיהוי דיבור משתמש במילת המפתח `voice`; בטקסט דינמי אסורים רק נקודה+מקף; סדר פרמטרי `read=` קריטי (`sayAndGatherDigits`/`sayAndGatherSpeech`). מקור קהילתי: freeivr.co.il post/76.
+
+### תסריט ו-TTS (לפי משוב משיחות אמיתיות)
+- משפט פתיחה קבוע בכל שיחה: "הגעתם למערכת קביעת התורים של מספרת יוסי" (`WELCOME_GREETING`).
+- בחירת טווח שעות (בוקר/צהריים/ערב, `getDayPeriods`, `renderTimeOrPeriodStep`) כשמסרבים להצעה הקרובה או כשיש יותר מ-9 שעות פנויות.
+- **TTS:** תאריך מילולי ("9 באוגוסט", לא "9/8" שנקרא "9 חלקי 8" ולא "5.8" שה-`sanitize()` קוטע ל"58"); בלי "/" למגדר (`את/ה`) — ניסוח מחדש; ניקוי חלקי (נוסף ניקוד ל"סיום"/"מספרה" 2026-10-05; "מעולה" ללא ניקוד); בלי סימני דגש (עיוות "תוור"); `buildSegments` — הפסקה בין משפטים (קטעי `t-` מחוברים ב-`.`); `speakTime` — שעה ל-12 שעות + "ו-X דקות".
+- **רשימת שירותים בטלפון מוגבלת ל-3:** תספורת מבוגר / תספורת + זקן / תספורת ילד (IVR בלבד).
+- בחירת "יום אחר" כשאין תאריך נוסף — לא מנתקת (החלטה #15): מודיעה וחוזרת להצעת השעה הקרובה (`renderDayPickStep` → `renderSlotOfferStep`, מחשבת זמינות מחדש); רק אם גם השעה שהוצעה נעלמה — ניתוק.
+
+### מתג כיבוי גלובלי (`AppSettings.ivr_enabled`, 2026-08-09)
+`getIvrEnabled`/`setIvrEnabledAction` (`settings.ts`), `IvrToggle` ב-`/admin/settings`, ברירת מחדל פעיל. כשכבוי, `startCall()` בודק אותו **ראשון — לפני `identifyCaller`/כל כתיבה ל-DB** — עונה "לא ניתן לקבוע תורים כרגע דרך הטלפון" ומנתק; לא נוצר `CallState`. שונה מחסימה פר-מספר (`identity.outcome === "blocked"`) — זה חוסם את כל הקו.
+
+### סימון "נקבע בטלפון" אצל הספר (2026-09-22)
+`Appointment.booked_via_ivr` (נקבע ב-`bookAppointmentCore(..., viaIvr)`; רק `bookViaPhone.ts` מעביר `true`). `getAppointmentsForWorkDay` מחזיר `booked_via_ivr` ו-`phone_number` (הטלפון נחשף **רק** לתורי IVR, לא בהדפסות/ייצוא), ו-`QuickDayAppointments` מציג "נקבע בטלפון (IVR) · <טלפון>" וכפתור "חיוג" (`tel:`).
+
+---
+
+## 12. אבטחה והרשאות
+
+### כללים לסוכן הקוד
+- **לעולם אל תקרא/תדפיס `.env`/`apps/worker/.env`/`~/.ssh`/`~/.aws`** — נאכף ע"י `permissions.deny` וגם ע"י PreToolUse hook חוסם (`.claude/hooks/block-secrets.sh`, `exit 2`) ב-`.claude/settings.json`.
+- שאילתות DB תמיד דרך Prisma — לעולם לא `$queryRaw`/`$executeRaw` עם קלט לא-סניטייז.
+- כל mutation שמקבל id חייב לבדוק בעלות/הרשאה בשרת (דפוס `booked_by_user_id !== session.sub` ב-`booking.ts`/`cancellationRequests.ts`) — לא לסמוך על כך שה-UI לא מציג כפתור.
+- ברירת מחדל סגורה: פעולת אדמין חדשה חייבת `requireAdmin()`/`requireAdminSession()`.
+- אל תדפיסו OTP/סיסמה/טוקן ל-console — `MockSmsProvider` (`packages/shared/src/sms.ts`) כבר עושה redact לקודים; לא לרשום טלפון/תוכן הודעה בלוג.
+- זרימות אימות (login, reset, שליחה/אימות קוד) עוברות דרך `lib/rateLimit.ts` (in-memory, per-process — מוגבל בפריסה מרובת-אינסטנסים; ראו הערה בקובץ). כל endpoint חדש שמנחש credential חייב rate limit דומה.
+- ידוע ופתוח: אין revocation לסשן קיים בעת reset סיסמה (JWT stateless). בשילוב הסשן ה-sliding (סעיף 10), טוקן שממשיך להיות בשימוש הופך בפועל לבלתי-מוגבל בזמן.
+- ממצאי ביקורת: `security/` (`INFRA`, `SOFTWARE`, `AGENT-HARDENING`), `privacy/`. סוכן `.claude/agents/security-reviewer.md` זמין.
+
+### גישה ל-`/admin` — שתי הגנות בו-זמנית, לעולם לא רק אחת
+1. **`apps/web/src/proxy.ts`** — רץ ב-edge *לפני* כל קוד עמוד, על `/admin/:path*` (matcher); מונע גישה ע"י הקלדת URL גם אם עמוד ישכח לבדוק.
+2. **`requireAdmin()`** (`lib/auth/session.ts`) — נקרא בתוך כל `page.tsx` תחת `/admin`.
+
+כל עמוד/נתיב ניהול חדש (כולל דינמיים כמו `/admin/day/[id]`) **חייב** גם להיכלל ב-matcher וגם לקרוא ל-`requireAdmin()` — אף אחד אינו תחליף לשני. (Next.js 16 החליף `middleware.ts` ב-`proxy.ts` — קובץ `middleware.ts` לצד `proxy.ts` יקריס את השרת.)
+
+---
+
+## 13. עיצוב (Design System)
+
+אין קובץ עיצוב נפרד מלבד `.claude/skills/barberbook-design/SKILL.md` — הכללים כאן הם המקור. **לטעון את ה-skill לפני כל שינוי UI.**
+
+### ערכת נושא
+**ערכת נושא בהירה אחת גלובלית** לכל האפליקציה (לקוח + `/admin`) מ-2026-07-25. מקור: קובץ פיגמה קהילתי ("Hair Salon | Barber Shop…", file key `RLOrFLhV7pQErRxAUiA3do`) שהותאם עם לוגו "Yossi Barber". `/admin` היה על ערכה כהה נפרדת — בוטלה, כי הלוגו החדש (שחור+זהב) לא קריא על רקע כהה; הטוקנים הכהים הוסרו לגמרי. **חריג יחיד:** עמודי הדפסה/ייצוא נשארים לבנים פשוטים.
+
+### פלטת צבעים (`globals.css`)
 | טוקן | HEX | תפקיד |
 |---|---|---|
-| `cream` | `#fdf8f0` | רקע בהיר גלובלי (`body`, כל `<main>` באפליקציה) |
-| `barber-teal` | `#508186` | צבע מותג ראשי — כותרות, מסגרות, כפתורים, קישורים |
-| `barber-teal-dark` | `#3d666a` | גוון כהה יותר של הטורקיז, לשימוש עתידי (hover/pressed) — לא בשימוש פעיל עדיין |
-| `ink` | `#1f2421` | טקסט ראשי כהה |
+| `cream` | `#fdf8f0` | רקע גלובלי |
+| `barber-teal` | `#508186` | מותג ראשי — כותרות, מסגרות, כפתורים, קישורים |
+| `barber-teal-dark` | `#3d666a` | לשימוש עתידי (hover/pressed), לא פעיל |
+| `ink` | `#1f2421` | טקסט ראשי |
 | `slate-muted` | `#7c7c7c` | טקסט משני/placeholder |
-| `cream-text` | `#fffcf7` | טקסט לבן-שבור על רקע `barber-teal` מלא (כפתורים) |
+| `cream-text` | `#fffcf7` | טקסט על רקע `barber-teal` מלא |
 
-**מוסכמות רכיבים (כל האפליקציה, כולל `/admin` מ-2026-07-25):** שדות טקסט — `rounded-xl` (לא `rounded` רגיל), מסגרת `border-barber-teal`, רקע לבן. כפתורים ראשיים — `rounded-full` (פיל מלא), רקע `bg-barber-teal`, טקסט `text-cream-text`. כפתורים משניים — `rounded-full` עם מסגרת בלבד (`border-barber-teal text-barber-teal`, ללא מילוי). כרטיסי מידע (הודעות, תורים) — `rounded-xl border-barber-teal bg-white`. אלו נלקחו ישירות מ-corner-radius שנמדדו בקובץ הפיגמה (כ-10px לשדות, ~200px+ לכפתורים — בפועל pill מלא בכל גובה סביר). **כפתורי מחיקה/הרס** (מחיקת יום עבודה, הסרת חסימה וכו') חורגים מהצבע הזה בכוונה — נשארים `text-red-600`/`border-red-600` סמנטית אדומים, אבל עם אותה צורה (`rounded-full` לכפתור בודד, `rounded-xl` לפאנל אישור עם כמה כפתורים).
+### מוסכמות רכיבים
+- שדות טקסט: `rounded-xl`, `border-barber-teal`, רקע לבן.
+- כפתור ראשי: `rounded-full bg-barber-teal text-cream-text`. משני: `rounded-full` עם מסגרת בלבד (`border-barber-teal text-barber-teal`).
+- כרטיסי מידע: `rounded-xl border-barber-teal bg-white`.
+- כפתורי מחיקה/הרס: אותה צורה אבל `text-red-600`/`border-red-600` (`rounded-full` לבודד, `rounded-xl` לפאנל אישור עם כמה כפתורים).
+- **כותרות** (`<h1>`, גם `PageHeader`): `text-center`. כשיש כפתור "חזרה" (`forgot-password`/`reset-password`) — `div` שקוף `w-[22px]` בצד הנגדי כדי שהכותרת תהיה ממורכזת ביחס לכל השורה.
+- **פונט:** Rubik (`next/font/google`, `hebrew`+`latin`) גלובלי ב-`app/layout.tsx` על `<html>` — לא להוסיף שוב בעמודים. חריג ישן: `app/(auth)/login/page.tsx` דורס ל-`Heebo` (לא טופל).
 
-### לוח שנה — שני מימושים נפרדים (`account/book` ו-`/admin`), אל תתבלבלו ביניהם
+### לוגו
+קובץ יחיד: `apps/web/public/logo-cropped.png` — האמנות בלבד, רקע שקוף אמיתי. הוסרו: `logo.svg` הישן, `<Logo/>`, `admin-logo*.svg`.
+- **למה PNG ולא SVG:** ה-SVG המקורי השתמש ב-`<mask>`/`<pattern>`/`<image>` מקוננים — נראה תקין ב-Chromium שולחני אך **לא הופיע בדפדפן נייד אמיתי** (WebKit/Safari). הפתרון: רינדור חד-פעמי ברזולוציה כפולה עם alpha אמיתי ושטיחה ל-PNG. **אם הלוגו משתנה — ליצור PNG חדש באותה שיטה מקובץ המקור; לא לחזור ל-SVG מבוסס mask ולא לערוך PNG ידנית.**
+- **קומפוננטים (לא אוחדו, חיים בחלקים שונים של העץ):** `<BrandHero />` (לקוח), `<AdminBrandHero />` (`/admin`, מוזרם דרך `topBanner` של `PageHeader`). שניהם: גרדיאנט `from-barber-teal/50 to-cream`, `-mx-6`, בלי תיבה/מסגרת, גובה `90px` ורוחב `auto`.
+- **מיקום: בראש העמוד**, מיד אחרי `<BsdBar/>`. כל עמוד לקוח חדש **חייב** `<BrandHero />` אחרי `<BsdBar/>`; כל עמוד `/admin` חדש **חייב** `topBanner={<AdminBrandHero/>}` ב-`<PageHeader/>`.
 
-**מסך לקוח (`DateCalendar`, בתוך `account/book/page.tsx`, לא מופרד לקובץ נפרד — קטן מספיק כרגע):** רשת חודשית אמיתית (RTL, יום ראשון בצד ימין), רק תאריכים שקיימים ב-`getOpenDates()` ניתנים ללחיצה (עיגול טורקיז מלא), השאר מוצגים דהויים ולא לחיצים. ניווט בין חודשים מוגבל לחודשים שבהם יש בפועל תאריך פתוח אחד לפחות (נגזר מ-`dates`, לא כל חודש קלנדרי) — כדי שלא יהיה אפשר "לתעות" בחודשים ריקים. שעות פנויות (`slot` step) עברו מגריד מלבנים לכפתורי-פיל עגולים (`rounded-full`).
+### "בס"ד" — `BsdBar`
+רכיב אחד משותף (`components/BsdBar.tsx`) בכל עמוד: ילד ראשון תחת `<main>`, `sticky top-0`, `-mx-6 -mt-6` (שובר את `p-6` של ה-`<main>`). ב-`/admin` מגיע דרך `<PageHeader title? topBanner? />` שמחזיר fragment `<><BsdBar/>{topBanner}{title && <h1>}</>` (בלי `div` עוטף, כדי שה-`-mx-6 -mt-6` יעבדו). כרגע כל עמודי `/admin` מעבירים `<AdminBrandHero/>`.
 
-**מסך אדמין (`AdminDateCalendar`, בתוך `apps/web/src/app/admin/OpenWorkDayForm.tsx`, ב"פתיחת יום עבודה חדש") — אותו עיצוב ויזואלי, לוגיקה הפוכה (2026-07-26):** כאן הספר הוא זה שפותח יום, אז **כל** תאריך עתידי לחיץ (לא רק רשימה סגורה), חוץ מתאריכי עבר ותאריכים שכבר קיימים כיום עבודה פתוח (מוצגים דהויים/disabled). ניווט חודשים חופשי קדימה, חסום אחורה מהחודש הנוכחי. **תבנית UI חשובה שכדאי לחזור עליה בעתיד:** הלוח לא מוצג תמיד פתוח — יש שדה קומפקטי (נראה כמו `<input>` רגיל, מציג את התאריך שנבחר או "בחרו תאריך") שבלחיצה עליו פותח את הלוח כ"פופאפ" מתחתיו (`calendarOpen` state); בחירת תאריך סוגרת אותו חזרה. זה נמנע מלוח שנה תפוס-שטח שתמיד גלוי בעמוד.
+### חיבור לפיגמה
+`FIGMA_ACCESS_TOKEN` ב-`.env` (לא ב-git). רשימת frames: `GET https://api.figma.com/v1/files/{key}?depth=2`; תמונות: `GET /v1/images/{key}?ids=<node-ids>&format=png`. אין סקריפט קבוע (נעשה ad-hoc בשיחה); אם יחזור — להפוך לסקריפט ב-`scripts/`.
 
-**מוסכמת כותרות (מ-2026-07-26):** כל כותרת עמוד (`<h1>`, כולל `PageHeader`'s title ב-`/admin`) ממורכזת (`text-center`) — כולל מקרים עם כפתור "חזרה" לצידה (`forgot-password`/`reset-password`): במקרה כזה יש `div` מרווח שקוף (`w-[22px]`, תואם לרוחב ה-`BackIcon`) בצד הנגדי לכפתור, כדי שהכותרת (`flex-1 text-center`) תהיה ממורכזת אמיתית ביחס לרוחב כל השורה, לא רק ביחס למקום הפנוי שנשאר לה.
+---
 
-### פונט
+## 14. תחזוקה, תלויות ובדיקות
 
-- **Rubik** (Google Fonts, `next/font/google`, subsets `hebrew`+`latin`), נטען גלובלית ב-`app/layout.tsx` על תגית ה-`<html>`. אין להוסיף אותו שוב בעמודים בודדים. משמש את כל האפליקציה. (חריג ידוע: `app/(auth)/login/page.tsx` דורס אותו מקומית ל-`Heebo` — לא קשור לאיחוד ה-2026-07-25, סטייה ישנה יותר שלא טופלה כאן.)
+### Dependabot
+`.github/dependabot.yml` פעיל. ניקוי 2026-09-06: `pnpm-workspace.yaml` `overrides` ל-`browserslist`/`deepmerge-ts`; עודכנו `next`, `react*`, `@types/*`, `tsx`, `jose` 5→6 (smoke-test על `signSession`/`verifySessionToken`), `zod` 3→4 (smoke-test על סכימות `validation.ts`); 2026-09-21 תוקנו `sharp` (libheif RCE) ו-`js-yaml`.
+**שלושה עדכונים נדחו בכוונה אחרי שנבדקו ונמצאו שוברים** (נשארו כ-PR פתוח ב-GitHub עם הסבר — לא למחוק/למזג בלי לבדוק שהתלויות התעדכנו):
+- `@prisma/client`/`prisma` → 7.x: מסיר `datasource { url = env(...) }` — דורש `prisma.config.ts` + driver adapter (מיגרציה אמיתית).
+- `typescript` → 7.x: שובר טיפוסי Prisma + `@typescript-eslint` לא תומך; תלוי בעדכון Prisma קודם.
+- `eslint` → 10.x: `eslint-plugin-react` (בתוך `eslint-config-next`) קורס על API שהוסר.
 
-## מפורשות מחוץ לסקופ (Out of Scope)
-
-אין לממש: תשלום/סליקת אשראי באפליקציה, מערכת נאמנות, דירוגים/ביקורות, ריבוי סניפים, צ'אט לקוח-ספר. (ריבוי ספרים באותה מספרה **כן** קיים — ראו "ספרי משנה" למטה — מה שנשאר מחוץ לסקופ הוא ריבוי מספרות/סניפים נפרדים.)
-
-## מצב נוכחי
-
-מונוריפו pnpm פעיל: `apps/web` (Next.js), `apps/worker`, `packages/db` (Prisma), `packages/shared`. הרוב עדיין לא committed (יש שינויים מצטברים ב-worktree) — יש להריץ `git status`/`git diff` לפני שמניחים שמשהו כבר בהיסטוריה.
-
-**קיים ועובד (נבדק ידנית בדפדפן):**
-- **אימות לקוח** — הרשמה/כניסה/יציאה/איפוס סיסמה (SMS מדומה דרך `packages/shared/src/sms.ts`).
-- **קביעת תור ללקוח** (`account/book`) — בחירת שירות (כולל שירותי ילד, ללא צ'ק-בוקס — `Service.is_child_service` קובע אם מבקשים שם ילד), תאריך, שעה, קביעה נוספת חוזרת לאותה זרימה. **מ-2026-10-05: בחירת שעה לא קובעת מיד** — צעד `summary` מציג כרטיס "סיכום פרטי התור" (ספר, שירות, ילד, תאריך, שעה — באותו עיצוב גרדיאנט כמו כרטיסי "הודעות חשובות" ב-`/account`) עם "אישור" (רק הוא קורא ל-`bookAppointmentAction`) ו"ביטול" (חזרה להתחלה, `bookAnother`).
-- **שינוי תור ללקוח** (`account/appointments` + `RescheduleButton`).
-- **`apps/web/src/lib/availability.ts`** — `findAvailableSlots`/`isSlotAvailable`: רשת קבועה של 10 דקות מתחילת יום העבודה, מתיישרת מחדש בדיוק לסוף כל תור/הפסקה/חסימה (בלי מרווח) — כדי שלא יוצגו שתי אפשרויות בפער קטן מ-10 דקות גם כששירות אינו כפולה של 10. מכוסה בטסטים (`pnpm test` בתוך `apps/web`).
-- **תיקון timezone**: כל תצוגת זמן משתמשת ב-`ISRAEL_TIME_ZONE` (`packages/shared`) במפורש — Server Components רצים בשעון השרת, לא בשעון ישראל, אז בלי `timeZone` מפורש התצוגה הייתה שגויה.
-- **מסכי ניהול (`/admin`)** — מוגנים ע"י `requireAdmin()` (מפנה לקוח/לא-מחובר הצידה, לא רק מסתיר תוכן):
-  - פתיחת יום עבודה חדש + הפסקות דינמיות.
-  - עדכון שעות של יום פתוח (נחסם אם יש תור/הפסקה/חסימה מחוץ לטווח החדש).
-  - צפייה בתורי יום + העברת תור לשעה אחרת באותו יום (`/admin/day/[id]`) — שולח SMS + רושם `Notification` ללקוח עם חשבון מקושר; תור ידני ללא חשבון מועבר בלי הודעה.
-  - קביעת תור ידנית ללקוח ללא חשבון (שם בלבד, ללא טלפון). **מ-2026-10-05: בלי בחירת שירות** — הספר בוחר רק שם + משך זמן (5/10/15 דק', `MANUAL_APPOINTMENT_DURATIONS`). כל משך ממופה לשירות מוסתר (`Service.is_manual_only`, "תור ידני X דק'", נוצרים ב-migration `20261005130000_add_manual_only_services` וגם ב-seed) כדי ש-`Appointment.service_id` יישאר חובה וכל חישובי המשך/העברת תור יעבדו כרגיל. `getServices` מסנן אותם (לא מוצגים ללקוח/IVR), ו-`bookAppointmentCore` דוחה אותם כרשת ביטחון.
-  - חסימת/הסרת חסימה של מספרי טלפון (`/admin/blocked-customers`) — נאכף גם בהרשמה וגם בקביעה/שינוי תור, וחל גם על מספרים שטרם נרשמו.
-  - **ביטול תור בודד** (`CancelAppointmentButton`, US-017) — soft, הופך `status` ל-`cancelled` ומשחרר את השעה מחדש; שולח SMS+`Notification` ללקוח עם חשבון מקושר.
-  - **מחיקת יום/כל היומן לצמיתות** (US-012, "מחיקת היום כולו" ב-`/admin/day/[id]`, "מחיקת כל היומן" ב-`/admin`) — hard delete אמיתי (cascade), עם עותק להדפסה/PDF אופציונלי לפני (`/admin/day/[id]/print`, `/admin/print-all`) והודעת ביטול לכל לקוח עם תור פעיל מקושר בטווח שנמחק.
-  - **אישור/דחיית בקשות ביטול** (`/admin/cancellation-requests`, US-008).
-- `zonedTimeToUtc()` ב-`packages/shared` — ממיר שעון קיר ישראלי (כולל שעון קיץ/חורף, בלי ספריית tz) ל-UTC; משמש את כל טפסי הניהול.
-- `runSerializable()` הועבר ל-`apps/web/src/lib/serializableTransaction.ts` (לא בקובץ `"use server"`) כדי שיהיה ניתן לשימוש חוזר משם.
-- `notifyAppointmentCancelled()` ו-`sendCustomerNotification()` (גנרי) ב-`apps/web/src/lib/notifyCustomer.ts` — המקום היחיד שכותב ל-`Notification`; `appointment_id`/`cancellation_request_id` מושארים `null` כשמדובר במחיקה קשה (הרשומה לא שורדת, אי אפשר להצביע אליה).
-- **חשוב:** לפני שליחת הודעת ביטול על תור, תמיד לבדוק גם `starts_at >= new Date()` (לא רק `status === "scheduled"`) — אין בסכימה סטטוס "הסתיים" נפרד, אז תור היסטורי נשאר `scheduled` לנצח ועלול לגרום להודעת "בוטל" מטעה על משהו שכבר קרה, אם שוכחים את הבדיקה הזו (זו הייתה תקלה אמיתית שתוקנה ב-`deleteWorkDayAction`/`deleteAllWorkDaysAction`/`cancelAppointmentAction`).
-- `account/appointments` **כבר** מסנן `starts_at >= now` — הלקוח אף פעם לא רואה תורים שהתאריך שלהם עבר; אין צורך בשינוי נוסף כדי לממש את זה.
-- **בקשת ביטול מהלקוח** (US-008, `CancellationRequest`) — לקוח שולח בקשה מ-`account/appointments` (`RequestCancellationButton`). **ההתנהגות תלויה במדיניות "דורש אישור" (ראו למטה):** כשהיא דלוקה, הבקשה ממתינה עד שהספר מאשר/דוחה ב-`/admin/cancellation-requests` (badge מספר ממתינות ב-`/admin`) — רק אישור משנה את `Appointment.status` ל-`cancelled` בפועל, דחייה משאירה את התור פעיל, והלקוח מקבל הודעה על ההחלטה (`type: cancellation_decision`). כשהיא כבויה, `requestCancellationAction` מבטלת את התור **מיידית** בלי ליצור `CancellationRequest` כלל — אותה תוצאה כמו ביטול ישיר ע"י הספר. `CancellationRequest.appointment_id` הוא `@unique` בסכימה — רק שורה אחת אי-פעם לכל תור, אז בקשה שנדחתה מתעדכנת בחזרה ל-`pending` בבקשה נוספת במקום ליצור שורה שנייה.
-- **מדיניות "דורש אישור"** (US-018, `AppSettings`, `apps/web/src/lib/actions/settings.ts`) — מתג יחיד וגלובלי (`getRequiresApproval()`/`setRequiresApprovalAction()`) שנקרא גם בקביעת תור וגם בבקשת ביטול; לא לפי יום/לקוח/שירות. מוגדר ב-`/admin/settings` (`ApprovalToggle`). ברירת מחדל: כבוי.
-- **בקשות תורים** (US-019/US-020, `BookingRequest`) — כשהמדיניות דלוקה, `bookAppointmentAction` יוצרת את ה-`Appointment` (סטטוס `scheduled`, תופס את השעה מיד) **וגם** `BookingRequest` (`pending`) לצידו, ומחזירה `pendingApproval: true` ללקוח (מסך "הבקשה שלך נשלחה לאישור הספר" ב-`account/book`) במקום את התראת "נקבע תור חדש" הרגילה למנהל. הספר מאשר/דוחה ב-`/admin/booking-requests` (badge ב-`/admin`, `getPendingBookingRequestCount()`): אישור לא נוגע בתור; דחייה הופכת אותו ל-`cancelled` (ומפעילה `notifyWaitlistOfFreedSlot` אם השעה עדיין עתידית) ושולחת ללקוח הודעת `booking_decision`. **מ-2026-10-05, גם בזמן ההמתנה הלקוח יכול לשנות מועד או לבטל** (`/account/appointments`): שינוי מועד משאיר את הבקשה `pending` לשעה החדשה (הספר מקבל התראה "עדיין ממתין לאישורך"); ביטול הוא מיידי בלי אישור ספר — `requestCancellationAction` **מוחקת** את ה-`BookingRequest` (`deleteMany` מותנה ב-`pending`, אין סטטוס "withdrawn" ב-enum) ומבטלת את התור. `decideBookingRequest` מעדכנת עם `updateMany` מותנה ב-`pending` כדי לא לקרוס אם הלקוח ביטל באותו רגע.
-- **התראות מנהל** (US-021, `notifyAdmin.ts`, `adminNotifications.ts`, `/admin/notifications`) — כשהמדיניות כבויה, כל תור שלקוח קובע לעצמו (`notifyAdminsOfNewBooking`) יוצר `Notification` מסוג `appointment_booked` לכל מנהל (בתוך האפליקציה בלבד, בלי SMS); תור ידני שהספר קובע לא מפעיל את זה. badge ב-`/admin` סופר לפי `read_at IS NULL`; `markAdminNotificationsReadAction` היא "סמן הכל כנקרא" (bulk `updateMany`) — אין סימון פר-שורה.
-- **רשימת המתנה** (US-022–US-025, `WaitlistEntry`, `apps/web/src/lib/actions/waitlist.ts`) — כללית, לא לפי תאריך/שירות; `user_id` הוא `@unique` אז הצטרפות חוזרת היא no-op. `joinWaitlistAction`/`leaveWaitlistAction`/`isOnWaitlist` בצד הלקוח (`account/book`, `LeaveWaitlistButton` ב-`/account`); `getWaitlistEntries`/`removeWaitlistEntryAction` בצד הספר (`/admin/waitlist`) — הסרה ידנית, בלי הודעה ללקוח. **שלושה** טריגרים נפרדים להודעה (`type: waitlist_slot_available`, דרך helper משותף `notifyAllWaitlistEntries`): (1) `notifyWaitlistOfFreedSlot` — כל ביטול תור עתידי (ביטול ישיר ע"י הספר, אישור/ביטול-מיידי של בקשת ביטול, דחיית בקשת תור); (2) `notifyWaitlistOfExtendedHours` — כש-`updateWorkDayHoursAction` **מרחיבה** יום שכבר פתוח (טווח חדש רחב מהישן); (3) `notifyWaitlistOfNewWorkDay` — כש-`createWorkDayAction` פותחת יום חדש **לגמרי** (תוקן 2026-07-26 — עד אז זה היה חסר: לקוח שהצטרף לרשימת ההמתנה כש**אין אף יום פתוח** מעולם לא קיבל התראה, כי פתיחת היום הראשון אינה "הרחבה" של כלום). ב-`account/book` מצב "אין ימים פתוחים" מנוסח כ"התרע/י לי כשייפתחו תאריכים לקביעת תורים" (לא "רשימת המתנה" גנרית) — אותו מנגנון בדיוק, רק ניסוח ממוקד למקרה הזה.
-- **חסימת יום מקביעת תורים חדשים** (`WorkDay.is_blocked`, נוסף 2026-07-26) — הטוגל (`BlockDayToggle`) קיים בשני מקומות: הגרסה המלאה (עם טקסט הסבר) ב-`/admin/day/[id]`, וגרסה קומפקטית (`compact` prop, נוסף 2026-07-26) ממש מתחת לקישור "ניהול היום" בכל שורת יום ברשימת "ימי עבודה פתוחים" במסך הראשי של `/admin` — שתיהן קוראות לאותה `setWorkDayBlockedAction`, אין לוגיקה כפולה. חוסם קביעה/שינוי תור **של לקוחות** בלבד — התורים הקיימים לא נפגעים, וקביעת תור ידנית ע"י הספר (`CreateManualAppointmentForm`) עדיין עובדת. נאכף בשלוש שכבות: `getOpenDates()` (לא מציגה יום חסום ללקוח בכלל), `bookAppointmentAction`/`rescheduleAppointmentAction` (זורקות `DAY_BLOCKED` כרשת ביטחון גם אם המסך אצל הלקוח לא עדכני). badge "חסום" מוצג ליד היום ברשימת "ימי עבודה פתוחים" ב-`/admin`. שונה במפורש מ-`BlockedTime` (חוסם טווח שעות בתוך יום, לא את כל היום) ומ"מחיקת יום" (hard delete בלתי הפיך) — שלוש דרכים נפרדות ושונות לגמרי לטפל ביום, אל תתבלבלו ביניהן.
-- **מתג כיבוי גלובלי לקביעת תור טלפונית (IVR)** (`AppSettings.ivr_enabled`, נוסף 2026-08-09, בקשה ישירה) — אותו דפדוף בדיוק כמו "דורש אישור" (`getIvrEnabled`/`setIvrEnabledAction` ב-`apps/web/src/lib/actions/settings.ts`, טוגל `IvrToggle` ב-`/admin/settings`). ברירת מחדל: פעיל (`true`). כשכבוי, `startCall()` (`lib/ivr/flow.ts`) בודק את המתג כדבר הראשון — **לפני** `identifyCaller`/כל כתיבה ל-DB — ועונה למתקשר "לא ניתן לקבוע תורים כרגע דרך הטלפון" ומנתקת מיד; לא נוצר `CallState` כלל, כך שאין מה ל-`continueCall()` לנקות. שונה לגמרי מ`BlockedPhoneNumber`/`identity.outcome === "blocked"` (חסימה פר-מספר טלפון) — זה חוסם את כל הקו לכולם, בלי קשר לזהות המתקשר.
-- **חסימת שעות שעברו** (FR-28) — `getSlotsForDate` מסננת שעות עם `d < now` לפני שהן מוצגות ללקוח; `bookAppointmentAction`/`rescheduleAppointmentAction` בודקות שוב `starts_at < new Date()` בתוך הטרנזקציה עצמה (זורקות `PAST_SLOT`) כרשת ביטחון למקרה שהמסך אצל הלקוח לא עדכני. הבדיקה **לא** בתוך `findAvailableSlots`/`isSlotAvailable` עצמן (`apps/web/src/lib/availability.ts`) — הן נשארות טהורות/דטרמיניסטיות ומכוסות ב-11 הטסטים הקיימים; הסינון לפי "עכשיו" הוא רק בשכבת ה-action.
-- **הודעות כלליות** (US-009, `Announcement`) — הספר מפרסם ב-`/admin/announcements`; מוצגות ללקוח ב-`/account` (הכי חדשה קודם). ללא SMS/Notification per-customer — ה-PRD דורש רק תצוגה באפליקציה, לא שידור טקסטים. כרטיס ההודעה אצל הלקוח (2026-07-26): רקע גרדיאנט אלכסוני `bg-gradient-to-bl from-barber-teal to-cream` (טורקיז בפינה הימנית-עליונה נמס לקרם בפינה השמאלית-תחתונה — אותה זוגיות צבעים כמו רקע הלוגו, ראו "לוגו" למעלה, אבל אלכסוני במקום אנכי ובלי `/50` כי כאן יש טקסט על גביו). הטקסט בכרטיס `text-ink` (כהה) ולא `text-cream-text` (לבן) כמו קודם — לבן היה נעלם על הקצה הבהיר של הגרדיאנט.
-- **ספרי משנה** (`Barber`, נוסף 2026-08-03) — הספר (admin היחיד שמתחבר) יכול להוסיף ספרים שעובדים תחתיו דרך `/admin/barbers` (שם בלבד, בלי login נפרד — `Barber` היא ישות "שם + יומן" גרידא, לא חשבון `User`). לכל `Barber` יומן `WorkDay` נפרד לגמרי (`WorkDay.barber_id`, אילוץ ייחודיות `[barber_id, work_date]` — שני ספרים יכולים לפתוח את אותו תאריך במקביל). `Barber.is_primary` מסמן את הספר המקורי/הראשי (מ-seed, `id: "primary"`) שמציע את כל 6 השירותים; ספר-משנה (`is_primary: false`) מוגבל לשלושה שירותים קבועים בלבד — `SUB_BARBER_SERVICE_NAMES` ב-`packages/shared` (תספורת מבוגר, תספורת + זקן, תספורת ילד) — לא ניתן להגדרה פר-ספר, זה כלל קבוע. הלקוח בוחר ספר כצעד ראשון ב-`account/book` (מדלג אוטומטית אם יש רק ספר פעיל אחד — כלומר לפני הוספת ספר-משנה ראשון, ה-flow זהה לגמרי למה שהיה) ואז ממשיך לתאריך/שירות/שעה כרגיל, הכל מסונן דרך `getOpenDates(barber_id)`/`getServices(barber_id)`. שינוי מועד תור (`RescheduleButton`) **יכול** להעביר תור לספר אחר, בתנאי שהשירות הקיים של התור מוצע גם על ידו — נאכף בשרת (`SERVICE_NOT_OFFERED`) בנוסף לסינון ב-UI. השבתת ספר (`is_active`, לא מחיקה — `WorkDay.barber_id` הוא `onDelete: Restrict`) מסתירה אותו מבוררי הלקוח אבל משאירה את היומן/התורים שלו נגישים לניהול אצל האדמין (`/admin?barber=<id>`); הספר הראשי לעולם לא ניתן להשבתה. רשימת ההמתנה (`WaitlistEntry`) ו-`AppSettings.requires_approval` **לא** הפכו למודעים-לספר — נשארו כלליים/גלובליים כפי שהיו, בכוונה (לא התבקש שינוי בהיקף שלהם).
-- **`apps/worker`** — לא עוד placeholder: `node-cron` (כבר היה תלות מוצהרת מ-Phase 1) מריץ כל דקה `sendDueReminders()` (`apps/worker/src/reminders.ts`) שמאתר תורים `scheduled` עם חשבון מקושר שמתחילים בתוך `APPOINTMENT_REMINDER_LEAD_MINUTES` (120 דק', `packages/shared`) וללא `Notification` מסוג `appointment_reminder` קיים עדיין — האידמפוטנטיות מסתמכת רק על הבדיקה הזו (אין דגל "תזכורת נשלחה" נפרד בסכימה). נבדק ידנית קצה-לקצה (יצירת תור זמני 30 דק' קדימה, הרצה כפולה, מחיקה) — נשלחת פעם אחת בלבד. השרת דורש `apps/worker/.env` (מקומי, לא ב-git כמו שאר קבצי ה-.env) עם `DATABASE_URL`; `pnpm --filter @barberbook/worker dev` (או `pnpm worker` מהשורש) מריץ אותו עם `--env-file=.env`.
-- `formatIsraelDate`/`formatIsraelTime` הועברו מ-`apps/web/src/lib/notifyCustomer.ts` ל-`packages/shared` כדי ש-`apps/worker` (חבילה נפרדת, בלי גישה ל-`apps/web`) יוכל להשתמש בהן גם כן.
-- **PWA אמיתי עם אפשרות התקנה** (2026-08-04, `@serwist/next`) — `apps/web/src/app/sw.ts` הוא מקור ה-service worker (Serwist, לא next-pwa — לא תחזוקתי מספיק מול Next 16); `next.config.ts` עוטף אותו ב-`withSerwist` שמייצר `public/sw.js` בזמן build (git-ignored, ראו `.gitignore`). `public/site.webmanifest` תוקן ממדגם placeholder (`MyWebSite`) לערכי מותג אמיתיים (שם, `theme_color: #508186`, `background_color: #fdf8f0`, אייקונים `192/512` עם `purpose: "any maskable"`). הרישום בפועל בצד הלקוח הוא `<SerwistProvider swUrl="/sw.js" disable={NODE_ENV !== "production"}>` ב-`app/layout.tsx` — Serwist **לא** מזריק סקריפט רישום אוטומטי (בניגוד ל-next-pwa), חובה `SerwistProvider` מפורש. `<InstallPrompt/>` (`apps/web/src/components/InstallPrompt.tsx`) תופס `beforeinstallprompt` ומציג באנר התקנה מעוצב (`rounded-xl border-barber-teal`); ב-iOS (אין `beforeinstallprompt`) מציג הנחיה טקסטואלית "שיתוף ← הוסף למסך הבית" במקום — מותאמת לדפדפן (ספארי: כפתור בסרגל; כרום/Edge/פיירפוקס ל-iOS: בשורת הכתובת). זיהוי iOS משותף ב-`apps/web/src/lib/ios.ts` (2026-10-06), כולל אייפד iPadOS 13+ שמזדהה כ-Mac (`maxTouchPoints > 1`) — לא לזהות iOS לפי user agent בלבד במקום אחר. דחייה נשמרת ב-`localStorage` כדי לא להטריד שוב.
-  - **גוֹצְ'ה קריטי ל-deploy:** Next.js 16 בררת המחדל היא Turbopack גם ל-`next build`, ו-Serwist (webpack-based) מתנגש איתו. `apps/web/package.json`'s `"build"` script שונה ל-`next build --webpack` בגלל זה. **תמיד להריץ `pnpm build` (או `pnpm --filter @barberbook/web build`) — לעולם לא `next build`/`pnpm exec next build` ישירות** (זה ידלג על הדגל ויכשל). **עדכון 2026-08-05: אותה בעיה קיימת גם ב-`dev`, לא רק ב-`build`** — בניגוד למה שהונח כאן קודם ("Serwist מכבה את עצמו מחוץ ל-production, זו רק אזהרה לא מזיקה"), בפועל `next dev` (טורבופאק כברירת מחדל) **קורס עם שגיאה** ("This build is using Turbopack, with a `webpack` config and no `turbopack` config") ברגע ריצה ראשון, לא רק מדפיס אזהרה. `apps/web/package.json`'s `"dev"` script שונה בהתאם ל-**`next dev --webpack`**.
-- **התראות Push אמיתיות למנהל (2026-09-06, `web-push`)** — נפרד לגמרי מ-"התראות מנהל" (`Notification`/`/admin/notifications` badge, US-021 למעלה) שהוא in-app בלבד: זה מנגנון Web Push אמיתי, מציג התראת מכשיר/דפדפן גם כשהאפליקציה סגורה. נוסף אחרי שהמשתמשת דיווחה בבדיקות קבלה שאינה מקבלת שום התראה בפועל — התברר שהמנגנון הקודם היה in-app בלבד. מודל `PushSubscription` חדש (`user_id`, `endpoint` ייחודי, `p256dh`/`auth`) — מכשיר/דפדפן אחד לכל שורה, אדמין יכול להירשם ממספר מכשירים. מפתחות VAPID ב-`.env` (`NEXT_PUBLIC_VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`, ראו `.env.example` והוראות deploy ב-`docs/DEPLOY.md`) — בהיעדרן `sendPushToAdmins()` (`apps/web/src/lib/push.ts`) היא no-op שקטה, שום flow קיים לא נשבר. `apps/web/src/app/sw.ts` מטפל ב-`push`/`notificationclick` (בנוסף ללוגיקת ה-precache הרגילה של Serwist). `<PushNotificationToggle/>` (`apps/web/src/components/PushNotificationToggle.tsx`) ב-`/admin/notifications` — הרשמה/ביטול חד-פעמיים למכשיר הנוכחי (`subscribeToPushAction`/`unsubscribeFromPushAction`, `apps/web/src/lib/actions/push.ts`), עם טיפול נפרד ב-iOS (Apple מחייבת שם התקנה בפועל למסך הבית לפני שWeb Push עובד בכלל — Android/Desktop לא צריכים התקנה). שלוש נקודות שליחה, שתיים מהן חדשות (לא היה שום דבר — לא in-app ולא push — קודם): `notifyAdminsOfNewBooking` (קיים, נוסף רק push) + שתי פונקציות חדשות `notifyAdminsOfBookingRequest`/`notifyAdminsOfCancellationRequest` (שתיהן `apps/web/src/lib/notifyAdmin.ts`) שנקראות מ-`booking.ts`/`bookViaPhone.ts`/`cancellationRequests.ts` בדיוק בענף ה-"דורש אישור" — קודם לכן בקשת תור/ביטול ממתינה לא יצרה שום `Notification` בכלל, רק ספרה ב-badge שנראה רק אם פותחים את `/admin`. שני ערכי `NotificationType` חדשים בהתאם: `booking_request_pending`/`cancellation_request_pending`.
-- **Push גם ללקוחות + התראות מנהל על שינויים (2026-09-21/22, נבדק ע"י המשתמשת במכשיר אמיתי בשרת הפיתוח — הכפתור והתראות עובדים; תרחישים פרטניים ייתכן שלא כולם נבדקו):** אותו מנגנון Web Push וטבלת `PushSubscription` — `subscribeToPushAction` פתוחה לכל משתמש מחובר (לא רק אדמין), עם אימות `endpoint` מול allowlist של שירותי push אמיתיים (`apps/web/src/lib/pushEndpoint.ts`, מונע SSRF כי השרת שולח POST לכתובת) ותקרת 10 מכשירים למשתמש. `<PushNotificationToggle audience="customer"/>` ב-`/account`. **קוד השליחה עבר ל-`packages/db/src/push.ts`** (`sendPushToAdmins`/`sendPushToUser`/`sendPushToCustomers`, מיוצאים מ-`@barberbook/db`; `web-push` תלות של `packages/db`) כדי ש-`apps/web` וגם `apps/worker` ישתמשו באותו קוד; הפונקציות לא זורקות לעולם (כשל push לא מפיל קביעה/ביטול), no-op שקטה בלי VAPID, ורושמות `[push] delivery failed <status>` לכשל שאינו 404/410. `prisma` הועבר ל-`packages/db/src/client.ts` (`index.ts` מייצא מחדש) כדי למנוע import מעגלי. **ללקוח:** `sendCustomerNotification` שולחת גם push — מכסה שינוי/ביטול תור ע"י הספר (כולל מחיקת יום/יומן/ספר), החלטות על בקשות תור/ביטול ורשימת ההמתנה (שעות שהורחבו / יום חדש — רק לרשימת ההמתנה); `adminRescheduleAppointmentAction` עברה ל-`sendCustomerNotification`. **תור שהתפנה** (`notifyWaitlistOfFreedSlot(starts_at, service, owner_user_id)`, החלטת המשתמשת 2026-09-22): ~~רשימת ההמתנה + כל לקוח שהפעיל push~~ — **שונה 2026-10-06:** רק חברי רשימת ההמתנה שהשאירו דלוק את `WaitlistEntry.notify_freed_slots` (ברירת מחדל `true`, migration `20261006120000`; מתג "התראה כשמתפנה תור" בתיבת רשימת ההמתנה ב-`/account`, `FreedSlotNotifyToggle`/`setNotifyFreedSlotsAction`) מקבלים (שורת `Notification` + push). לקוחות שאינם ברשימה **לא** מקבלים יותר. המתג חל רק על "תור שהתפנה" — יום חדש/הרחבת שעות נשלחים לכל הרשימה. בעל התור שהתפנה מוחרג (ידע כבר). **הודעה חדשה מהספר** → push לכל מנויי הלקוחות בלבד (בלי שורת `Notification`, ללא push על עריכה/מחיקה). **תזכורת לפני תור:** `apps/worker/src/reminders.ts` שולח עכשיו גם push — ה-worker צריך את משתני `VAPID_*` ב-`apps/worker/.env` (ב-Docker `env_file: .env` משותף, אין צורך בשינוי); בשרת הפיתוח רץ תחת pm2 בשם `barberbook-worker` (`pnpm exec tsx --env-file=.env src/index.ts` מתוך `apps/worker`). **לספר:** `notifyAdmin.ts` עם helper אחד (`notifyAdmins`) — תור חדש (אתר + IVR), בקשת תור/ביטול ממתינות, `notifyAdminsOfCustomerReschedule`, `notifyAdminsOfCustomerCancellation` (ביטול מיידי כשהמדיניות כבויה) ו-`notifyAdminsOfNewCustomer` (`NotificationType.customer_registered`, migration `20260922003000` — נקרא מ-`registerUserCore` ולכן מכסה גם הרשמה דרך הטלפון). **באג שתוקן:** `adminNotifications.ts` סינן רק `appointment_booked`, ולכן בקשות ממתינות לא הופיעו בפיד/ב-badge — עכשיו `ADMIN_NOTIFICATION_TYPES`. **החלטות שסוכמו:** העברת תור (ע"י לקוח/ספר) *לא* מודיעה על השעה הישנה שהתפנתה; הצטרפות/עזיבת רשימת המתנה לא מודיעה לספר. **פתוח:** SMS עדיין `NoopSmsProvider` (איפוס סיסמה לא שולח קוד — יטופל בנפרד); `pm2 save` לא הורץ, אז ה-worker לא ישרוד אתחול של השרת.
-- **סימון תור שנקבע בטלפון (IVR) אצל הספר (2026-09-22, נפרס בשרת הפיתוח, נבדק ע"י `tsc`/טסטים בלבד — טרם נבדק עם שיחת IVR אמיתית):** `Appointment.booked_via_ivr` (Boolean, ברירת מחדל `false`, migration `20260922120000`) נקבע ב-`bookAppointmentCore(..., viaIvr)` — רק `ivr/bookViaPhone.ts` מעביר `true`. `getAppointmentsForWorkDay` מחזיר `booked_via_ivr` ו-`phone_number` (הטלפון נחשף **רק** לתורים שנקבעו בטלפון, לא בהדפסות/ייצוא), ו-`QuickDayAppointments` (משמש גם את דף הבית וגם את `/admin/day/[id]`) מציג "נקבע בטלפון (IVR) · <טלפון>" וכפתור "חיוג" (`tel:`). **תורים שנקבעו בטלפון לפני 2026-09-22 לא מסומנים** (לא נשמר מידע כזה קודם). לא סומן בדפי בקשות-אישור/ביטול ובהתראת המנהל על תור חדש — אפשר להוסיף.
-- **כניסה עם קוד SMS (2026-09-22, כבויה כברירת מחדל — ראו "איפה עצרנו" למעלה ו-`docs/SMS-LOGIN.md`):** `lib/loginMode.ts` (`isSmsLoginEnabled()`), `lib/actions/smsLogin.ts` (שלבים send/verify/signup), `lib/smsLoginCore.ts` (קודי HMAC חד-פעמיים, טבלה `login_codes`, migration `20260922130000`), `login/SmsLoginForm.tsx`, `login/admin` (כניסת מנהל בסיסמה), `getOtpSmsProvider()` נפרד מ-`getSmsProvider()` (התראות נשארות בלי SMS), `Sms019Provider` (`packages/shared/src/sms019.ts`, לא נבדק מול חשבון), ניקוי קודים ישנים ב-worker. במצב `sms_code`: `/register`/`/forgot-password`/`/reset-password` מפנים ל-`/login`, `loginAction` מקבלת רק מנהל, `/admin` ללא סשן מפנה ל-`/login/admin`. **`/login` הוא `force-dynamic`** (הצורה תלויה ב-env בזמן ריצה).
-- **ניקוי Dependabot (2026-09-06)** — `pnpm-workspace.yaml`'s `overrides` תוקן ל-`browserslist`/`deepmerge-ts` (שני alerts בחומרה גבוהה, שניהם build/dev-time בלבד — לא runtime). בנוסף עודכנו ללא בעיה: `next`, `react`/`react-dom`/`@types/react`/`@types/react-dom`, `@types/node`, `tsx`, `jose` (5→6, נבדק smoke-test על `signSession`/`verifySessionToken`), `zod` (3→4, נבדק smoke-test על כל סכימות `validation.ts`). **שלושה עדכונים נדחו בכוונה אחרי שנבדקו בפועל ונמצאו שוברים:** `@prisma/client`/`prisma` ל-7.x (מסיר תמיכה ב-`datasource { url = env(...) }` לגמרי — דורש `prisma.config.ts` + driver adapter, מיגרציה אמיתית לא bump), `typescript` ל-7.x (שובר את כל טיפוסי ה-Prisma הנוכחיים + `@typescript-eslint` עדיין לא תומך, תלוי בעדכון Prisma קודם), `eslint` ל-10.x (`eslint-plugin-react` בתוך `eslint-config-next` קורס בפועל על API שהוסר). שלושתם נשארו כ-PR פתוח ב-GitHub עם הסבר בתגובה — לא למחוק/למזג בלי לבדוק מחדש שהתלויות שלהם התעדכנו.
-
-- **מסך `/admin` הראשי עוצב מחדש (2026-09-21, בקשה ישירה של המשתמשת)** — שלוש מטרות: לחסוך ניווט לפעולות דחופות, להציג את תורי היום הרלוונטי ישירות, ולאפשר קביעת תור ידני/ביטול בלי לצאת מהמסך הראשי. **תפריט:** `בקשות תורים`/`בקשות ביטול`/`התראות` הוצאו מ-`AdminMenu` (נשארו רק `לקוחות חסומים`/`רשימת המתנה`/`הודעות כלליות`/`הגדרות`/`ניהול ספרים`) והפכו לשלושה כפתורים גדולים מוערמים וממורכזים (`w-64 mx-auto`) עם באדג' הספירה הקיים, מתחת לבורר הספרים. **תצוגת "היום הרלוונטי":** `getWorkDaysAdmin` (`lib/actions/workdays.ts`) סונן עכשיו לפי `ends_at >= now()` ולא לפי תאריך בלבד — יום שהסתיימו שעותיו (אבל התאריך שלו עדיין "היום") כבר לא נחשב "פתוח" ונעלם גם מהתצוגה המהירה וגם מרשימת "ימי עבודה פתוחים" למטה (לא נמחק מה-DB, רק לא מוצג); `workDays[0]` אחרי הסינון הזה הוא תמיד היום הפתוח האמיתי הבא. **רכיב משותף חדש** `apps/web/src/app/admin/QuickDayAppointments.tsx` — מרנדר את ציר-הזמן של יום (`buildDayTimeline`) עם כפתור "ביטול תור" לכל תור, ו"קביעת תור ידני" לכל שעה פנויה (פותח `CreateManualAppointmentForm` inline עם השעה ממולאת מראש — הרכיב קיבל פרופס אופציונליים חדשים `initialStartsAt`/`onCancel` לשם כך). נעשה בו שימוש חוזר בשני מקומות: במסך הראשי (ליד "היום הפתוח הקרוב", בלי כפתור העברה) וב-`/admin/day/[id]` (עם `showMoveButton` — מחליף שם את הרינדור הידני הקודם של הציר, כולל `MoveAppointmentButton`). **מיקום/עיצוב כפתור מחיקת יומן:** `DeleteAllWorkDaysButton` הוזז מ"היסטוריה וגיבוי" לשורה אחת עם כפתור "תפריט" (משמאל לו, מול הצד) ועוצב באותה מידה/גופן בדיוק (`rounded-full border px-4 py-2 text-sm font-medium`) רק באדום במקום טורקיז. **עיצוב הרשימה:** כרטיס הרשימה עטוף באותו סגנון כרטיס לבן כמו "פתיחת יום עבודה חדש" (`border-barber-teal bg-white rounded-xl border p-4`); שלושת כפתורי הפעולה ליד השורות (ביטול תור / קביעת תור ידני / העברת תור) אוחדו לעיצוב "כפתור קטן" אחיד (`bg-barber-teal text-cream-text rounded-full px-3 py-1 text-xs font-medium`), כולל "ניהול היום"; הוסר padding אופקי לא-אחיד ששבר את היישור של הכפתורים בין שורת "פנוי" לשורת תור תפוס; שעות פנויות מוצגות שחור מודגש (`text-ink font-bold`), עם רק המילה "פנוי" באדום (`text-red-600`) — עודכן 2026-09-22 לפי בקשה (במקור: שחור+טורקיז, עבר שלב ביניים של אדום אחיד לכל השורה, ואז חזרה חלקית לשחור עם רק המילה עצמה אדומה).
-
-**טרם קיים קוד עבורו:** שום דבר מה-PRD הנוכחי. הכל ב-US-001 עד US-025 ו-FR-1 עד FR-35 ממומש. **חסימת יום מקביעת תורים** (ראו למעלה) ו**ספרי משנה** (ראו למעלה) הן תוספות מעבר ל-PRD המקורי — לא ממוספרות כ-US, נוספו לפי בקשה ישירה של המשתמשת (2026-07-26 ו-2026-08-03 בהתאמה).
-
-**קביעת תור טלפונית (IVR, 2026-08-03 תכנון / 2026-08-04 מימוש מול ימות המשיח — קוד
-עובר build/lint/test, לא נבדק מול שיחה אמיתית):** ראו `docs/# IVR BarberBook.txt`
-(סטטוס מעודכן בראש המסמך). **הספק הוחלף מ-Twilio לימות המשיח (2026-08-04)** — Twilio
-התברר כלא מציע בכלל מספרי טלפון ישראליים, לא עניין של אישור/regulatory bundle כמו
-שהונח בתכנון המקורי. לוגיקת העסק **נשארה בשימוש בלי שינוי**, תלוית-ספק-אפס:
-`bookAppointmentCore` (`lib/actions/bookingCore.ts`), `registerUserCore`
-(`lib/actions/registerCore.ts`), ומכונת המצבים של תסריט השיחה ב-`lib/ivr/flow.ts` (רק
-שינוי שמות פרמטרים). **שכבת האינטגרציה הספציפית ל-Twilio נמחקה** (`twiml.ts`,
-`verifySignature.ts`, `apps/web/src/app/api/ivr/{voice,gather}/route.ts`, תלות
-`twilio` ב-`package.json`) **והוחלפה בשכבה מול ימות המשיח:** `lib/ivr/yemotResponse.ts`
-(בונה מחרוזת פקודות טקסטואלית, לא XML), `lib/ivr/verifyWebhookSecret.ts` (אין מנגנון
-חתימה מתועד כמו `X-Twilio-Signature` אצל Yemot — האבטחה היא סוד ב-URL עצמו, ראו החלטה
-#17 במסמך), ו-route יחיד `apps/web/src/app/api/ivr/yemot/[secret]/route.ts`. **עדכון
-2026-08-05:** קו ימות המשיח נרכש (`0772248273`), ו-`.env` מלא עם שלושת המשתנים
-(`YEMOT_PHONE_NUMBER`/`YEMOT_WEBHOOK_SECRET`/`PUBLIC_BASE_URL` — האחרון דרך דומיין
-ngrok סטטי חינמי לבדיקות, `marlin-capitol-carat.ngrok-free.dev`, עד שיירכש דומיין
-אמיתי). נמצא מקור קהילתי מפורט משמעותית (freeivr.co.il `post/76`) שאישר/תיקן כמה
-פרטי תחביר: `read=` לזיהוי דיבור משתמש במילת המפתח `voice` (לא `Speech` כפי שהונח
-קודם), רשימת התווים האסורים בטקסט דינמי היא רק נקודה+מקף, וברירת המחדל היא בקשות
-GET (לא POST). לפי זה תוקנו שני באגים אמיתיים בקוד: `yemotResponse.ts`'s
-`sayAndGatherDigits`/`sayAndGatherSpeech` בנו את מחרוזת `read=` עם פרמטרים בסדר
-שגוי, ו-`flow.ts`'s `weekdayDate` בנה תאריך בפורמט "5.8" שה-`sanitize()` (בצדק) קטע
-ל-"58" חסר משמעות. **עדכון 2026-08-08:** השלוחה הוגדרה בממשק ימות, ובוצעה שיחת
-בדיקה אמיתית ראשונה שעברה בהצלחה עד הצעת התור הקרוב ביותר (זיהוי מתקשר → רישום
-בפועל ב-DB → בחירת ספר → בחירת שירות), פותרת סופית את GET מול POST (**GET**) ואת
-פורמט `ApiPhone` (**מקומי**) — עדיין לא אומתה הכתיבה בפועל של תור (המתקשרת ניתקה
-לפני אישור שעה). **אותו עדכון, הרחבת פיצ'ר:** נוספה בחירת טווח שעות (בוקר/צהריים/
-ערב, `getDayPeriods`) כשמסרבים להצעת התור הקרוב ביותר או כשיש יותר מ-9 שעות פנויות
-ביום — ראו `lib/ivr/flow.ts`'s `renderTimeOrPeriodStep`. **עדכון נוסף, אותו יום:
-מעבר שלם על איכות הדיבור (TTS) לפי משוב המשתמשת משיחות אמיתיות חוזרות** —
-`weekdayDate` תוקן (התאריך נקרא "9/8" כ"9 חלקי 8", הוחלף בפורמט מילולי "9
-באוגוסט"); כל ניסוח עם "/" למגדר (`את/ה`, `תרצה/י`, `תקבל/י`) נוסח מחדש
-גם הוא מאותה סיבה; נוסף ניקוד לתסריט (חלקית — "מעולה" הוחזר לבלי ניקוד אחרי
-שנשמע פחות טוב מנוקד/עם מתג); כל סימני הדגש הוסרו אחרי שגרמו לעיוות ("תור"
-נשמע "תוור"); נוסף מנגנון הפסקה בין משפטים (`yemotResponse.ts`'s
-`buildSegments` — קטעי `t-` נפרדים מחוברים ב-`.`, המפריד התיעודי בין
-"אנונסים" אצל Yemot) בכל המקומות שמשפט שלם רץ ישר לתוך הבא; נוספה
-`speakTime` (`flow.ts`) שממירה שעה ל-12 שעות ומוסיפה "ו-X דקות" בעברית
-טבעית במקום "13:25" גולמי; ונוספה הגבלת רשימת השירותים בטלפון (IVR בלבד,
-לא נוגע ב-DB/אפליקציה) לשלושה: תספורת מבוגר / תספורת + זקן / תספורת ילד.
-לפי משוב המשתמשת אחרי הבדיקה האחרונה: "נשמע יותר טוב". ראו סדר העבודה
-בסעיף 9 של המסמך. **עדכון 2026-08-09, שני שיפורי תסריט נוספים לפי משוב
-מבדיקות נוספות:** (1) נוסף משפט זיהוי קבוע בתחילת כל שיחה, לפני כל דבר
-אחר — "הגעתם למערכת קביעת התורים של מספרת יוסי" (`WELCOME_GREETING`
-ב-`flow.ts`). (2) בחירת "יום אחר" (שלב 5) כשאין אף תאריך פתוח נוסף מלבד
-זה שכבר הוצע כבר לא מנתקת את השיחה כאילו זו זמינות-אפס אמיתית (החלטה
-#15) — במקום זה מודיעה "אין כרגע תאריכים פתוחים נוספים, נסו שוב מאוחר
-יותר" וחוזרת להציע מחדש את השעה הפנויה הקרובה ביותר (`renderDayPickStep`
-נופלת חזרה ל-`renderSlotOfferStep`, מחשבת זמינות מחדש ולא מסתמכת על
-ערכים ישנים — עדיין נופלת נכון לניתוק האמיתי של החלטה #15 אם גם השעה
-שכבר הוצעה נעלמה בינתיים). `pnpm build`/`tsc --noEmit`/`pnpm test`
-(15/15) עוברים נקי; **לא נבדק עדיין מול שיחה אמיתית**.
-
-**הערת בדיקה:** US-018 עד US-023 (מדיניות אישור, בקשות תורים, התראות מנהל, הצטרפות/ניהול רשימת המתנה) נבדקו ידנית בדפדפן ע"י המשתמשת ב-2026-07-20/21. US-024 (התפנות תור) עבד בפועל באותה בדיקה כתופעת לוואי (בקשת תור שנדחתה שחררה שעה). חסימת שעות שעברו (FR-28) ו-US-025 (הודעת הרחבת שעות) נכתבו אחרי אותה בדיקה — עברו `tsc`, את 11 הטסטים הקיימים (`pnpm test`), ואימות לוגיקה ידני מול הסכימה/DB, אבל **לא עברו עדיין בדיקה ידנית בדפדפן** על ה-flow המלא (למשל: לקוח שרואה בפועל ש-09:00 נעלם מרשימת השעות אחרי שהשעה עברה; לקוח ברשימת המתנה שמקבל בפועל SMS/Notification אחרי שהספר הרחיב יום).
+### אימות שינויים
+- `pnpm test` (בתוך `apps/web`), `tsc --noEmit` (web, worker), `pnpm build`.
+- בדיקות ידניות בדפדפן ע"י המשתמשת: US-018..US-023 (2026-07-20/21); US-024 עבד כתופעת לוואי. שאר הפריטים הלא-מאומתים — בסעיף 2.
+- מצב git: ה-worktree מכיל לרוב שינויים שטרם נעשה להם commit — להריץ `git status`/`git diff` לפני שמניחים שמשהו בהיסטוריה.

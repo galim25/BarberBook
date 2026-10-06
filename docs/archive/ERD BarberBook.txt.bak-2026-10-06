@@ -1,0 +1,550 @@
+# ERD: BarberBook — מערכת ניהול תורים למספרה
+
+## 1. Overview
+
+המודל מתאר מערכת תפעולית לניהול לקוחות, שירותים, ימי עבודה ותורים עבור ספר עצמאי. מוקד המודל הוא זמינות מבוססת ימי עבודה, הפסקות ושעות חסומות, לצד תהליך קביעת תור, שינוי תור, בקשת ביטול ושליחת הודעות ללקוחות.
+
+המודל תומך גם בתורים שנקבעים עבור ילדים ובתורים ידניים שאינם בהכרח מקושרים לחשבון לקוח רשום.
+
+## 2. Mermaid Diagram
+
+```mermaid
+erDiagram
+    USER ||--o{ PASSWORD_RESET_CODE : "requests"
+    USER ||--o{ APPOINTMENT : "books"
+    USER ||--o{ CANCELLATION_REQUEST : "submits"
+    USER ||--o{ NOTIFICATION : "receives"
+    USER ||--o{ ANNOUNCEMENT : "publishes"
+    USER ||--o{ BLOCKED_PHONE_NUMBER : "blocks"
+    USER ||--o{ BOOKING_REQUEST : "reviews"
+    USER ||--o| WAITLIST_ENTRY : "joins"
+
+    SERVICE ||--o{ APPOINTMENT : "defines duration for"
+
+    WORK_DAY ||--o{ WORK_BREAK : "contains"
+    WORK_DAY ||--o{ BLOCKED_TIME : "closes"
+    WORK_DAY ||--o{ APPOINTMENT : "schedules"
+
+    APPOINTMENT ||--o| CANCELLATION_REQUEST : "receives"
+    APPOINTMENT ||--o{ NOTIFICATION : "triggers"
+    APPOINTMENT ||--o| BOOKING_REQUEST : "requires"
+    CANCELLATION_REQUEST ||--o{ NOTIFICATION : "triggers"
+
+    USER {
+        string id PK
+        string full_name
+        string phone_number
+        string password_hash
+        enum role "customer, administrator"
+        datetime created_at
+        datetime updated_at
+    }
+
+    PASSWORD_RESET_CODE {
+        string id PK
+        string user_id FK
+        string code
+        datetime expires_at
+        datetime verified_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    SERVICE {
+        string id PK
+        string name
+        integer duration_minutes
+        datetime created_at
+        datetime updated_at
+    }
+
+    WORK_DAY {
+        string id PK
+        date work_date
+        datetime starts_at
+        datetime ends_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    WORK_BREAK {
+        string id PK
+        string work_day_id FK
+        datetime starts_at
+        datetime ends_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    BLOCKED_TIME {
+        string id PK
+        string work_day_id FK
+        datetime starts_at
+        datetime ends_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    APPOINTMENT {
+        string id PK
+        string work_day_id FK
+        string service_id FK
+        string booked_by_user_id FK
+        string customer_name
+        string attendee_name
+        enum attendee_type "self, child, other"
+        datetime starts_at
+        datetime ends_at
+        enum status "scheduled, cancelled"
+        datetime created_at
+        datetime updated_at
+    }
+
+    CANCELLATION_REQUEST {
+        string id PK
+        string appointment_id FK
+        string requested_by_user_id FK
+        string reviewed_by_user_id FK
+        enum status "pending, approved, rejected"
+        datetime requested_at
+        datetime reviewed_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    NOTIFICATION {
+        string id PK
+        string user_id FK
+        string appointment_id FK
+        string cancellation_request_id FK
+        enum type "appointment_reminder, appointment_changed, cancellation_decision, appointment_booked, waitlist_slot_available, booking_decision"
+        text content
+        enum status "pending, sent, failed"
+        datetime scheduled_at
+        datetime sent_at
+        datetime read_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    BOOKING_REQUEST {
+        string id PK
+        string appointment_id FK
+        enum status "pending, approved, rejected"
+        datetime requested_at
+        string reviewed_by_user_id FK
+        datetime reviewed_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    APP_SETTINGS {
+        string id PK
+        boolean requires_approval
+        datetime updated_at
+    }
+
+    WAITLIST_ENTRY {
+        string id PK
+        string user_id FK
+        string customer_name
+        string phone_number
+        datetime created_at
+    }
+
+    ANNOUNCEMENT {
+        string id PK
+        string published_by_user_id FK
+        string title
+        text content
+        datetime published_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    BLOCKED_PHONE_NUMBER {
+        string id PK
+        string phone_number
+        string blocked_by_user_id FK
+        string reason
+        datetime created_at
+    }
+```
+
+## 3. Entities
+
+### User
+
+**Purpose:** מייצגת חשבון לקוח או חשבון מנהל מערכת המשמשים להזדהות ולהרשאות גישה.
+
+**Source:** US-001, US-002, US-003, US-004, US-006, US-007, US-008, US-009, US-011, US-013, US-014, US-016
+
+| Field         | Type                            | Required | Notes                          |
+| ------------- | ------------------------------- | -------- | ------------------------------ |
+| id            | string                          | yes      | Primary key                    |
+| full_name     | string                          | yes      | שם מלא של הלקוח או מנהל המערכת |
+| phone_number  | string                          | yes      | אמצעי ההתחברות של לקוח; ייחודי |
+| password_hash | string                          | yes      | ייצוג מאובטח של הסיסמה         |
+| role          | enum: [customer, administrator] | yes      | קובע גישה למסכי לקוח או ניהול  |
+| created_at    | datetime                        | yes      | Set at creation                |
+| updated_at    | datetime                        | yes      | Updated on every change        |
+
+### PasswordResetCode
+
+**Purpose:** מייצגת קוד אימות חד־פעמי שנשלח ללקוח לצורך איפוס סיסמה.
+
+**Source:** US-003
+
+| Field       | Type            | Required | Notes                      |
+| ----------- | --------------- | -------- | -------------------------- |
+| id          | string          | yes      | Primary key                |
+| user_id     | reference: User | yes      | הלקוח שביקש לאפס את הסיסמה |
+| code        | string          | yes      | קוד האימות שנשלח ב־SMS     |
+| expires_at  | datetime        | yes      | מועד פקיעת הקוד            |
+| verified_at | datetime        | no       | מועד אימות הקוד            |
+| created_at  | datetime        | yes      | Set at creation            |
+| updated_at  | datetime        | yes      | Updated on every change    |
+
+### Service
+
+**Purpose:** מייצגת שירות שניתן להזמין ואת משך הזמן שנדרש עבורו.
+
+**Source:** US-004, US-005, US-006, US-009
+
+| Field            | Type     | Required | Notes                   |
+| ---------------- | -------- | -------- | ----------------------- |
+| id               | string   | yes      | Primary key             |
+| name             | string   | yes      | שם השירות               |
+| duration_minutes | integer  | yes      | משך השירות בדקות        |
+| created_at       | datetime | yes      | Set at creation         |
+| updated_at       | datetime | yes      | Updated on every change |
+
+הערכים הנדרשים לפי ה־PRD:
+
+| Service          | Duration |
+| ---------------- | -------- |
+| תספורת מבוגר     | 10 דקות  |
+| תספורת + זקן     | 15 דקות  |
+| תספורת ילד       | 10 דקות  |
+| הסרת שיער בלייזר | 10 דקות  |
+| חלאקה            | 15 דקות  |
+| תספורת מבוגר + טיפול לייזר | 20 דקות |
+
+### WorkDay
+
+**Purpose:** מייצגת תאריך שהספר פתח להזמנות ואת טווח שעות העבודה באותו יום.
+
+**Source:** US-004, US-010, US-011, US-012, US-015
+
+| Field      | Type     | Required | Notes                      |
+| ---------- | -------- | -------- | -------------------------- |
+| id         | string   | yes      | Primary key                |
+| work_date  | date     | yes      | תאריך העבודה שנפתח להזמנות |
+| starts_at  | datetime | yes      | תחילת יום העבודה           |
+| ends_at    | datetime | yes      | סיום יום העבודה            |
+| is_blocked | boolean  | yes      | חוסם את היום מקביעת/שינוי תור ע"י לקוחות בלבד (ברירת מחדל: false) — תוספת מעבר ל-PRD המקורי, נוספה 2026-07-26, אינה חלק מ-US-004/US-010/US-011 |
+| created_at | datetime | yes      | Set at creation            |
+| updated_at | datetime | yes      | Updated on every change    |
+
+### WorkBreak
+
+**Purpose:** מייצגת הפסקה שבה לא ניתן לקבוע תורים בתוך יום עבודה.
+
+**Source:** US-010
+
+| Field       | Type               | Required | Notes                         |
+| ----------- | ------------------ | -------- | ----------------------------- |
+| id          | string             | yes      | Primary key                   |
+| work_day_id | reference: WorkDay | yes      | יום העבודה שבו מתקיימת ההפסקה |
+| starts_at   | datetime           | yes      | תחילת ההפסקה                  |
+| ends_at     | datetime           | yes      | סיום ההפסקה                   |
+| created_at  | datetime           | yes      | Set at creation               |
+| updated_at  | datetime           | yes      | Updated on every change       |
+
+### BlockedTime
+
+**Purpose:** מייצגת טווח שעות שהספר סגר ידנית להזמנה, בנוסף להפסקות הקבועות ביום העבודה.
+
+**Source:** US-011
+
+| Field       | Type               | Required | Notes                    |
+| ----------- | ------------------ | -------- | ------------------------ |
+| id          | string             | yes      | Primary key              |
+| work_day_id | reference: WorkDay | yes      | יום העבודה שבו הזמן נחסם |
+| starts_at   | datetime           | yes      | תחילת הטווח החסום        |
+| ends_at     | datetime           | yes      | סיום הטווח החסום         |
+| created_at  | datetime           | yes      | Set at creation          |
+| updated_at  | datetime           | yes      | Updated on every change  |
+
+### Appointment
+
+**Purpose:** מייצגת תור לשירות עבור לקוח, ילד או אדם אחר ביומן העבודה.
+
+**Source:** US-002, US-004, US-005, US-006, US-007, US-008, US-009, US-011, US-012, US-015, US-016
+
+| Field             | Type                         | Required | Notes                                           |
+| ----------------- | ---------------------------- | -------- | ----------------------------------------------- |
+| id                | string                       | yes      | Primary key                                     |
+| work_day_id       | reference: WorkDay           | yes      | יום העבודה שבו נקבע התור                        |
+| service_id        | reference: Service           | yes      | השירות שנבחר                                    |
+| booked_by_user_id | reference: User              | no       | החשבון שביצע את ההזמנה; ריק בתור ידני ללא חשבון |
+| customer_name     | string                       | yes      | שם הלקוח לצורך הצגה ביומן                       |
+| attendee_name     | string                       | yes      | שם האדם שמקבל את השירות                         |
+| attendee_type     | enum: [self, child, other]   | yes      | האם התור עבור הלקוח, ילד או אדם אחר             |
+| starts_at         | datetime                     | yes      | תחילת התור                                      |
+| ends_at           | datetime                     | yes      | מחושב לפי מועד ההתחלה ומשך השירות               |
+| status            | enum: [scheduled, cancelled] | yes      | מצב התור                                        |
+| created_at        | datetime                     | yes      | Set at creation                                 |
+| updated_at        | datetime                     | yes      | Updated on every change                         |
+
+### CancellationRequest
+
+**Purpose:** מייצגת בקשה של לקוח לבטל תור ואת החלטת מנהל המערכת.
+
+**Source:** US-008
+
+| Field                | Type                                | Required | Notes                    |
+| -------------------- | ----------------------------------- | -------- | ------------------------ |
+| id                   | string                              | yes      | Primary key              |
+| appointment_id       | reference: Appointment              | yes      | התור שעבורו נשלחה הבקשה  |
+| requested_by_user_id | reference: User                     | yes      | הלקוח ששלח את הבקשה      |
+| reviewed_by_user_id  | reference: User                     | no       | מנהל המערכת שאישר או דחה |
+| status               | enum: [pending, approved, rejected] | yes      | מצב הבקשה                |
+| requested_at         | datetime                            | yes      | מועד שליחת הבקשה         |
+| reviewed_at          | datetime                            | no       | מועד קבלת ההחלטה         |
+| created_at           | datetime                            | yes      | Set at creation          |
+| updated_at           | datetime                            | yes      | Updated on every change  |
+
+### Notification
+
+**Purpose:** מייצגת הודעה ללקוח או למנהל בנוגע לתזכורת, שינוי תור, החלטה בבקשת ביטול/תור, תור חדש שנקבע, או התפנות/הרחבת זמינות לרשימת המתנה.
+
+**Source:** US-007, US-008, US-009, US-016, US-019, US-020, US-021, US-024, US-025
+
+**הערת מודל:** אין `booking_request_id` נפרד — הודעת `booking_decision` מצביעה על `appointment_id` בלבד.
+
+| Field                   | Type                                                                     | Required | Notes                   |
+| ----------------------- | ------------------------------------------------------------------------ | -------- | ----------------------- |
+| id                      | string                                                                   | yes      | Primary key             |
+| user_id                 | reference: User                                                          | yes      | הלקוח שמקבל את ההודעה   |
+| appointment_id          | reference: Appointment                                                   | no       | התור הרלוונטי להודעה    |
+| cancellation_request_id | reference: CancellationRequest                                           | no       | בקשת הביטול הרלוונטית   |
+| type                    | enum: [appointment_reminder, appointment_changed, cancellation_decision, appointment_booked, waitlist_slot_available, booking_decision] | yes | סוג ההודעה |
+| content                 | text                                                                     | yes      | תוכן ההודעה             |
+| status                  | enum: [pending, sent, failed]                                            | yes      | מצב השליחה              |
+| scheduled_at            | datetime                                                                 | no       | מועד השליחה המתוכנן     |
+| sent_at                 | datetime                                                                 | no       | מועד השליחה בפועל       |
+| read_at                 | datetime                                                                 | no       | מועד קריאה — בשימוש כרגע רק להתראות מנהל (appointment_booked) |
+| created_at              | datetime                                                                 | yes      | Set at creation         |
+| updated_at              | datetime                                                                 | yes      | Updated on every change |
+
+### Announcement
+
+**Purpose:** מייצגת הודעה כללית שהספר פרסם ושמוצגת לכל הלקוחות.
+
+**Source:** US-009
+
+| Field                | Type            | Required | Notes                       |
+| -------------------- | --------------- | -------- | --------------------------- |
+| id                   | string          | yes      | Primary key                 |
+| published_by_user_id | reference: User | yes      | מנהל המערכת שפרסם את ההודעה |
+| title                | string          | yes      | כותרת ההודעה                |
+| content              | text            | yes      | תוכן ההודעה                 |
+| published_at         | datetime        | yes      | מועד הפרסום                 |
+| created_at           | datetime        | yes      | Set at creation             |
+| updated_at           | datetime        | yes      | Updated on every change     |
+
+### BlockedPhoneNumber
+
+**Purpose:** מייצגת מספר טלפון שהספר חסם מהרשמה או קביעת תורים, בין אם קיים עבורו חשבון ובין אם לאו.
+
+**Source:** US-014
+
+| Field              | Type            | Required | Notes                                  |
+| ------------------ | --------------- | -------- | --------------------------------------- |
+| id                 | string          | yes      | Primary key                             |
+| phone_number       | string          | yes      | ייחודי; לא בהכרח שייך לחשבון קיים       |
+| blocked_by_user_id | reference: User | yes      | מנהל המערכת שביצע את החסימה             |
+| reason             | string          | no       | סיבת החסימה                             |
+| created_at         | datetime        | yes      | Set at creation                         |
+
+### BookingRequest
+
+**Purpose:** מייצגת בקשה לתור חדש שממתינה לאישור הספר, נוצרת רק כשמדיניות "דורש אישור" (ראו AppSettings) דלוקה בזמן קביעת התור.
+
+**Source:** US-019, US-020
+
+| Field               | Type                                 | Required | Notes                                                      |
+| ------------------- | ------------------------------------- | -------- | ------------------------------------------------------------ |
+| id                  | string                                | yes      | Primary key                                                 |
+| appointment_id      | reference: Appointment                | yes      | ייחודי — לכל תור בקשה אחת לכל היותר                        |
+| status              | enum: [pending, approved, rejected]   | yes      | מצב הבקשה                                                   |
+| requested_at        | datetime                              | yes      | מועד קביעת התור (=מועד הבקשה)                              |
+| reviewed_by_user_id | reference: User                       | no       | מנהל המערכת שהחליט                                          |
+| reviewed_at         | datetime                              | no       | מועד ההחלטה                                                 |
+| created_at          | datetime                              | yes      | Set at creation                                              |
+| updated_at          | datetime                              | yes      | Updated on every change                                      |
+
+**הערת מודל חשובה:** ה-`Appointment` הנלווה נוצר מיד עם הבקשה (status `scheduled`) ותופס את השעה ביומן — הבקשה אינה "רק כוונה", אלא ריזרווציה בפועל. דחיית הבקשה משנה את `Appointment.status` ל-`cancelled` ומשחררת את השעה; אישור לא משנה את התור כלל.
+
+### AppSettings
+
+**Purpose:** רשומת קונפיגורציה גלובלית יחידה (singleton) שקובעת אם תורים ובקשות ביטול חדשים דורשים אישור מפורש של הספר.
+
+**Source:** US-018
+
+| Field              | Type      | Required | Notes                                          |
+| ------------------ | --------- | -------- | ------------------------------------------------ |
+| id                 | string    | yes      | Primary key, קבוע כ-`"singleton"` — תמיד שורה אחת בלבד |
+| requires_approval  | boolean   | yes      | ברירת מחדל `false`                              |
+| updated_at         | datetime  | yes      | Updated on every change                          |
+
+### WaitlistEntry
+
+**Purpose:** מייצגת לקוח הממתין להודעה כשמתפנה תור או נפתחות שעות נוספות. כללית — אינה משויכת לתאריך, שעה או שירות ספציפיים.
+
+**Source:** US-022, US-023, US-024, US-025
+
+| Field         | Type             | Required | Notes                                        |
+| ------------- | ---------------- | -------- | ----------------------------------------------- |
+| id            | string           | yes      | Primary key                                     |
+| user_id       | reference: User  | yes      | ייחודי — לקוח יכול להיות ברשימה פעם אחת בלבד בו-זמנית |
+| customer_name | string           | yes      | לתצוגה לספר                                     |
+| phone_number  | string           | yes      | לשליחת SMS                                      |
+| created_at    | datetime         | yes      | Set at creation; קובע את סדר ההצגה לספר         |
+
+## 4. Relationships
+
+**User → PasswordResetCode:** one-to-many
+
+* Description: לקוח יכול לבקש מספר קודי איפוס לאורך חיי החשבון, וכל קוד שייך לחשבון אחד.
+* Cascade: cascade
+* Source: US-003
+
+**User → Appointment:** one-to-many, optional from Appointment
+
+* Description: חשבון לקוח יכול להזמין מספר תורים, אך תור ידני יכול להישמר ללא חשבון מקושר.
+* Cascade: set null
+* Source: US-002, US-004, US-006, US-011
+
+**User → CancellationRequest:** one-to-many
+
+* Description: לקוח יכול לשלוח בקשות ביטול עבור התורים שהזמין.
+* Cascade: restrict
+* Source: US-008
+
+**User → Notification:** one-to-many
+
+* Description: לקוח יכול לקבל מספר הודעות ותזכורות.
+* Cascade: cascade
+* Source: US-007, US-008, US-009
+
+**User → Announcement:** one-to-many
+
+* Description: חשבון מנהל מערכת יכול לפרסם מספר הודעות כלליות.
+* Cascade: restrict
+* Source: US-009, US-013
+
+**User → BlockedPhoneNumber:** one-to-many
+
+* Description: מנהל מערכת יכול לחסום מספר מספרי טלפון; רשומת החסימה עצמה אינה תלויה בקיום חשבון עבור המספר החסום.
+* Cascade: restrict
+* Source: US-014
+
+**Service → Appointment:** one-to-many
+
+* Description: כל תור נועד לשירות אחד, ושירות יכול להופיע בתורים רבים.
+* Cascade: restrict
+* Source: US-004, US-005, US-006
+
+**WorkDay → WorkBreak:** one-to-many
+
+* Description: יום עבודה יכול לכלול הפסקה אחת או יותר.
+* Cascade: cascade
+* Source: US-010
+
+**WorkDay → BlockedTime:** one-to-many
+
+* Description: הספר יכול לחסום מספר טווחי זמן בתוך יום עבודה.
+* Cascade: cascade
+* Source: US-011
+
+**WorkDay → Appointment:** one-to-many
+
+* Description: יום עבודה יכול להכיל מספר תורים, וכל תור משויך ליום עבודה אחד.
+* Cascade: cascade
+* Source: US-004, US-010, US-011, US-012
+
+**Appointment → CancellationRequest:** one-to-zero-or-one
+
+* Description: לתור יכולה להיות בקשת ביטול פעילה אחת, ורק אישור הבקשה משנה את מצב התור למבוטל.
+* Cascade: cascade
+* Source: US-008
+
+**Appointment → Notification:** one-to-many
+
+* Description: תור יכול להפעיל תזכורת או הודעה בעקבות שינוי.
+* Cascade: cascade
+* Source: US-007, US-009
+
+**CancellationRequest → Notification:** one-to-many
+
+* Description: החלטה בבקשת ביטול יכולה להפעיל הודעה ללקוח.
+* Cascade: cascade
+* Source: US-008
+
+**User → BookingRequest:** one-to-many, optional (reviewer)
+
+* Description: מנהל מערכת יכול לסקור מספר בקשות תורים לאורך זמן; אם המשתמש נמחק, השדה מתאפס ולא נמחקת הבקשה עצמה.
+* Cascade: set null
+* Source: US-020
+
+**Appointment → BookingRequest:** one-to-zero-or-one
+
+* Description: לתור יכולה להיות לכל היותר בקשת אישור אחת — נוצרת רק כשהתור נקבע בזמן שמדיניות "דורש אישור" דלוקה.
+* Cascade: cascade
+* Source: US-019
+
+**User → WaitlistEntry:** one-to-zero-or-one
+
+* Description: לקוח יכול להיות ברשימת ההמתנה פעם אחת בלבד בו-זמנית.
+* Cascade: cascade
+* Source: US-022
+
+## 5. Coverage Map
+
+| User Story | Entities Involved                                           |
+| ---------- | ----------------------------------------------------------- |
+| US-001     | User                                                        |
+| US-002     | User, Appointment                                           |
+| US-003     | User, PasswordResetCode                                     |
+| US-004     | User, Appointment, Service, WorkDay, WorkBreak, BlockedTime |
+| US-005     | Service, Appointment                                        |
+| US-006     | User, Appointment, Service                                  |
+| US-007     | Appointment, WorkDay, Notification, User                    |
+| US-008     | User, Appointment, CancellationRequest, Notification        |
+| US-009     | User, Appointment, Service, Notification, Announcement      |
+| US-010     | WorkDay, WorkBreak                                          |
+| US-011     | User, WorkDay, BlockedTime, Appointment, Service            |
+| US-012     | WorkDay, Appointment                                        |
+| US-013     | User                                                        |
+| US-014     | User, BlockedPhoneNumber                                     |
+| US-015     | WorkDay, WorkBreak, BlockedTime, Appointment                 |
+| US-016     | User, WorkDay, Appointment, Notification                     |
+| US-017     | User, Appointment, Notification                              |
+| US-018     | AppSettings                                                  |
+| US-019     | User, Appointment, BookingRequest, AppSettings                |
+| US-020     | User, BookingRequest, Appointment, Notification               |
+| US-021     | User, Appointment, Notification, AppSettings                  |
+| US-022     | User, WaitlistEntry                                           |
+| US-023     | User, WaitlistEntry                                           |
+| US-024     | Appointment, CancellationRequest, BookingRequest, WaitlistEntry, Notification |
+| US-025     | WorkDay, WaitlistEntry, Notification                          |
+
+## 6. Open Questions
+
+* ה־PRD אינו דורש ניהול פרופילים קבועים לילדים. לכן פרטי הילד נשמרים ברמת התור באמצעות `attendee_name` ו־`attendee_type`, ללא ישות `Child` נפרדת.
+* ה־PRD מציין מחיקה של תורים ויומנים ללא אפשרות שחזור. לכן המודל מניח מחיקה מלאה ולא שמירה בארכיון.
+* המודל מניח שלכל תור יכולה להיות בקשת ביטול פעילה אחת בכל זמן. לאחר דחייה, ניתן לשמור את אותה בקשה כהיסטוריה או לפתוח בקשה חדשה בהתאם לכללי המוצר.
+* `AppSettings` הוא סינגלטון בכוונה (PK קבוע `"singleton"`) ולא טבלת key-value כללית — כרגע יש רק הגדרה אחת (`requires_approval`); אם יתווספו הגדרות גלובליות נוספות בעתיד, סביר להוסיף אותן כעמודות לאותה שורה ולא לבנות מנגנון גנרי.
+* `WaitlistEntry` כללי במכוון (לא לפי תאריך/שירות) לפי דרישת המוצר בפועל — לקוח מקבל הודעה על כל התפנות, לא רק על ההתפנות שרלוונטית לו ספציפית.
