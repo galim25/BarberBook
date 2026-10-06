@@ -1,0 +1,27 @@
+Browser / Mobile Web
+        |
+        v
+Nginx via aaPanel
+        |
+        v
+Next.js App Container
+  - Customer screens
+  - Admin screens
+  - API / Server actions
+  - Auth / sessions
+        |
+        v
+PostgreSQL
+  - Users
+  - Work days
+  - Breaks
+  - Blocked times
+  - Appointments
+  - Cancellation requests
+  - Notifications
+        ^
+        |
+Worker Container
+  - Sends reminders
+  - Sends cancellation decisions
+  - Sends appointment change SMS

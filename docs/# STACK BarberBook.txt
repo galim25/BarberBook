@@ -1,27 +1,73 @@
-Browser / Mobile Web
+# STACK: BarberBook
+
+Last updated: 2026-10-06 (previous version kept in docs/archive/STACK BarberBook.txt.bak-2026-10-06).
+Source of truth for details: CLAUDE.md (sections 4, 9, 10, 11), docs/DEPLOY.md, docs/SMS-LOGIN.md, docs/# IVR BarberBook.txt.
+
+## 1. Runtime architecture
+
+Browser / Mobile Web (installable PWA)          Phone call (IVR)
+        |                                              |
+        v                                              v
+Nginx container (HTTPS, Let's Encrypt via certbot)     Yemot HaMashiach (voice platform)
+        |                                              |
+        v                                              | HTTP GET webhook, secret in URL
+Next.js App Container (web)  <------------------------+
+  - Customer screens (booking, appointments, waitlist, announcements)
+  - Admin screens (/admin: calendar, requests, settings, barbers, contacts)
+  - Server Actions + API route for IVR (/api/ivr/yemot/[secret])
+  - Auth / sessions (JWT cookie, sliding 30-day window)
+  - proxy.ts (edge): guards /admin, refreshes the session, redirects by login mode
         |
         v
-Nginx via aaPanel
-        |
-        v
-Next.js App Container
-  - Customer screens
-  - Admin screens
-  - API / Server actions
-  - Auth / sessions
-        |
-        v
-PostgreSQL
-  - Users
-  - Work days
-  - Breaks
-  - Blocked times
-  - Appointments
-  - Cancellation requests
-  - Notifications
+PostgreSQL container (Prisma)
+  - Users, Barbers
+  - Work days, Breaks, Blocked times
+  - Services, Appointments
+  - Booking requests, Cancellation requests
+  - Notifications, Push subscriptions
+  - Waitlist, Announcements, Blocked phone numbers
+  - Login codes, Contact names, App settings
         ^
         |
-Worker Container
-  - Sends reminders
-  - Sends cancellation decisions
-  - Sends appointment change SMS
+Worker Container (node-cron, same database)
+  - Appointment reminders (every minute): in-app Notification + Web Push
+  - Daily cleanup of expired SMS login codes (03:17)
+
+Outbound services used by web and worker:
+  - Web Push (VAPID, `web-push`) to the browsers' push services
+  - SMS provider 019sms (login codes only; all other notifications are SMS-free)
+
+## 2. Technology
+
+| Layer | Choice | Notes |
+|---|---|---|
+| Monorepo | pnpm workspaces (pnpm 11.15, Node 22) | `apps/web`, `apps/worker`, `packages/db`, `packages/shared` |
+| Web framework | Next.js 16 (App Router, Server Actions), React | built with `--webpack` (Serwist is webpack-based); route guard file is `proxy.ts`, not `middleware.ts` |
+| Language | TypeScript | `packages/*` consumed as raw TS source (no own build step) |
+| Styling | Tailwind CSS, Rubik font (`next/font/google`) | one light theme app-wide; design rules in `.claude/skills/barberbook-design` |
+| Database | PostgreSQL + Prisma | schema: `packages/db/prisma/schema.prisma`; model docs: `docs/# ERD BarberBook.txt` |
+| Auth | `jose` (JWT in cookie), password hashing, one-time SMS login codes | customer mode set by `CUSTOMER_LOGIN_MODE` (`password` / `sms_code`); admin always signs in with a password |
+| Validation | `zod` | `apps/web/src/lib/validation.ts` |
+| PWA | `@serwist/next` (service worker `sw.ts`), web manifest | install prompt incl. iOS/iPadOS hint; the same worker handles push events |
+| Push | `web-push` (in `packages/db`) | VAPID keys; endpoint allowlist against SSRF; cap of 10 devices per user |
+| SMS | 019sms (`Sms019Provider`, `packages/shared`) | login codes only; a Mock provider exists for development |
+| Phone booking | Yemot HaMashiach IVR | state machine in `apps/web/src/lib/ivr/flow.ts`; business logic shared with the app |
+| Background jobs | `node-cron` in `apps/worker` | run through `tsx` (not a compiled binary) |
+| Tests | `node --test` via `tsx` | `pnpm test` in `apps/web` |
+| Dependencies | Dependabot (`.github/dependabot.yml`) | Prisma 7, TypeScript 7, ESLint 10 deliberately postponed (see CLAUDE.md section 14) |
+
+## 3. Deployment
+
+- **Docker** (since 2026-08-31): single root `Dockerfile` with `web` and `worker` targets; `docker-compose.yml` runs `postgres`, `web`, `worker`, `nginx`, `certbot` (a `docker-compose.preview.yml` exists for previews).
+- **Nginx** runs as a container from `nginx/templates/default.conf.template` (HTTPS plus basic headers, no CSP). It replaced the earlier aaPanel-managed Nginx.
+- **Deploy command on the production server:** `bash scripts/deploy.sh` (pull, build, force-recreate containers, verify migration count, migrate, smoke test `/login`). Full runbook: `docs/DEPLOY.md`.
+- **Build-time variables:** every `NEXT_PUBLIC_*` (currently `NEXT_PUBLIC_VAPID_PUBLIC_KEY`) must be declared as `ARG`/`ENV` in the Dockerfile build stage and as `build.args` in compose; `env_file` is runtime-only.
+- **Environments:** a development server (pm2: `barberbook-worker` plus the web app) and the production Docker stack; secrets live only in untracked `.env` files.
+
+## 4. Security layers
+
+- `/admin` is protected twice: the `proxy.ts` matcher (edge, before any page code) and `requireAdmin()` inside every admin page.
+- Server Actions re-check ownership/role on the server; database access only through Prisma.
+- Rate limiting (`lib/rateLimit.ts`, in-memory) on login, password reset and SMS code send/verify.
+- Claude Code guardrails: `.claude/settings.json` deny rules plus a blocking PreToolUse hook for secret files.
+- Audit documents: `security/`, `privacy/`.
