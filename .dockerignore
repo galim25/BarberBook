@@ -11,6 +11,6 @@ dist
 coverage
 *.log
 .env
-.env.*
+.env*
 !.env.example
 apps/worker/.env

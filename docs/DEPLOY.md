@@ -169,11 +169,38 @@ docker compose exec postgres pg_dump -U <POSTGRES_USER> <POSTGRES_DB> | gzip > b
 
 ## תחזוקה שוטפת
 
-- **עדכון קוד:** `git pull && docker compose build && docker compose up -d`
+- **עדכון קוד — תמיד דרך הסקריפט:**
+
+  ```bash
+  bash /root/barberbook/scripts/deploy.sh
+  ```
+
+  הסקריפט מבצע pull → build → החלפת קונטיינרים → migrate → בדיקת תקינות, ועוצר בשגיאה
+  ברורה בשלב הראשון שנכשל. אחריו: לסגור ולפתוח מחדש את האפליקציה בטלפון.
 - **לוגים:** `docker compose logs -f web` / `worker` / `nginx`
-- **מיגרציה חדשה של סכימה:** `docker compose exec web pnpm --filter @barberbook/db run migrate`
+- **מיגרציה ידנית** (הסקריפט כבר מריץ אותה): `docker compose exec web pnpm --filter @barberbook/db run migrate`
   (לא `pnpm db:migrate` — תיקון 2026-09-22: תיקיית העבודה במיכל `web` היא `apps/web`, שאין
   בו script כזה; ה-alias הזה קיים רק ב-`package.json` הראשי. אושר בפועל בפרודקשן.)
+
+> **תקלה אמיתית 2026-10-06 — למה לא `git pull && docker compose build && docker compose up -d`.**
+> אחרי `build` הקונטיינר `web` **לא הוחלף** והמשיך להריץ בנייה ישנה ופגומה (`docker compose ps`
+> הציג בעמודת IMAGE מזהה `sha256:...` גולמי במקום שם — סימן שהאימג' בשם הזה כבר חדש יותר
+> מהקונטיינר). שתי תוצאות:
+> 1. מסך "ניהול יום" קרס — `Could not find the module ".../EditHoursForm.tsx#EditHoursForm" in the React Client Manifest`.
+> 2. `migrate` שהורץ **בתוך הקונטיינר הישן** ראה רק את קבצי ה-migration הישנים, הדפיס
+>    "No pending migrations" ודילג בשקט על החדשה → `/account` (הדף שאליו מגיעים אחרי כניסת
+>    לקוח) קרס עם `PrismaClientKnownRequestError` → "הכניסה לא עובדת".
+>
+> הלקחים, ששלושתם נאכפים ע"י `scripts/deploy.sh`:
+> - **`up -d --force-recreate web worker`** — לא לסמוך על `up -d` שיזהה אימג' חדש.
+> - **migrate רק אחרי ההחלפה**, ולוודא שמספר ה-"N migrations found" שווה למספר התיקיות
+>   ב-`packages/db/prisma/migrations` בשרת. מספר קטן יותר = קונטיינר ישן.
+> - **אין קבצי `.env*` נוספים בתיקיית הפרויקט** (למשל `.env_old`): עד 2026-10-06
+>   `.dockerignore` סינן רק `.env` ו-`.env.*`, כך ש-`.env_old` הועתק לתוך האימג'. תוקן
+>   ל-`.env*`, והסקריפט גם מסרב לרוץ כשקובץ כזה קיים. גיבויים של `.env` — מחוץ לתיקייה (`/root/`).
+>
+> **אחרי כל פריסה, כדאי לסגור ולפתוח את האפליקציה בטלפון.** דף שנטען לפני הפריסה מחזיק
+> מזהי Server Actions של הבנייה הקודמת, ושליחת טופס ממנו (למשל קוד כניסה) נכשלת.
 
 ### הפעלת התראות Push למנהל (נוסף 2026-09-06)
 
