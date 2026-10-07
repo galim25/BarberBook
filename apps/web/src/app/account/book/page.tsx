@@ -135,6 +135,10 @@ export default function BookAppointmentPage() {
   const [services, setServices] = useState<ServiceOption[]>([]);
   const [dates, setDates] = useState<OpenDate[]>([]);
   const [datesLoading, setDatesLoading] = useState(true);
+  // Separate from `barbers.length === 0`: a load that is still running or that failed
+  // must not look like "the shop has no barbers" (2026-10-06 incident).
+  const [barbersLoading, setBarbersLoading] = useState(true);
+  const [barbersError, setBarbersError] = useState(false);
   const [slots, setSlots] = useState<string[]>([]);
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
@@ -174,27 +178,56 @@ export default function BookAppointmentPage() {
   // A shop with only one active barber (today's default, before any
   // sub-barber is added) skips straight to date selection — no pointless
   // single-option picker.
-  useEffect(() => {
-    getActiveBarbers().then((list) => {
-      setBarbers(list);
-      if (list.length === 1) {
-        chooseBarber(list[0]);
-      } else {
+  // Initial state is already loading=true/error=false, so nothing is set synchronously
+  // (setState inside the mount effect is flagged by react-hooks); results arrive in callbacks.
+  function requestBarbers() {
+    return getActiveBarbers()
+      .then(async (list) => {
+        setBarbers(list);
+        if (list.length === 1) {
+          if (!(await chooseBarber(list[0]))) setBarbersError(true);
+        } else {
+          setDatesLoading(false);
+        }
+      })
+      .catch(() => {
+        setBarbersError(true);
         setDatesLoading(false);
-      }
-    });
-    getRequiresApproval().then(setRequiresApproval);
-  }, []);
+      })
+      .finally(() => setBarbersLoading(false));
+  }
 
-  async function chooseBarber(b: BarberOption) {
+  function retryLoadBarbers() {
+    setBarbersLoading(true);
+    setBarbersError(false);
+    return requestBarbers();
+  }
+
+  /** Returns false (and shows an error) when the open dates could not be loaded. */
+  async function chooseBarber(b: BarberOption): Promise<boolean> {
     setBarber(b);
     setError(undefined);
     setDatesLoading(true);
-    const openDates = await getOpenDates(b.id);
-    setDates(openDates);
-    setDatesLoading(false);
-    setStep("date");
+    try {
+      const openDates = await getOpenDates(b.id);
+      setDates(openDates);
+      setStep("date");
+      return true;
+    } catch {
+      setError("לא הצלחנו לטעון את התאריכים הפנויים. נסו שוב.");
+      return false;
+    } finally {
+      setDatesLoading(false);
+    }
   }
+
+  useEffect(() => {
+    requestBarbers();
+    getRequiresApproval()
+      .then(setRequiresApproval)
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function chooseDate(d: OpenDate) {
     if (!barber) return;
@@ -299,7 +332,20 @@ export default function BookAppointmentPage() {
       {step === "barber" && (
         <div className="flex flex-col gap-2">
           <p className="text-ink font-bold">בחרו ספר:</p>
-          {barbers.length === 0 ? (
+          {barbersLoading ? (
+            <p className="text-slate-muted">טוען...</p>
+          ) : barbersError ? (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-red-600">לא הצלחנו לטעון את הנתונים. בדקו את החיבור ונסו שוב.</p>
+              <button
+                type="button"
+                onClick={retryLoadBarbers}
+                className="bg-barber-teal text-cream-text rounded-full py-3 text-center text-lg font-bold"
+              >
+                נסו שוב
+              </button>
+            </div>
+          ) : barbers.length === 0 ? (
             <p className="text-slate-muted">אין כרגע ספרים זמינים.</p>
           ) : (
             barbers.map((b) => (
@@ -313,6 +359,7 @@ export default function BookAppointmentPage() {
               </button>
             ))
           )}
+          {error && !barbersError && <p className="text-sm text-red-600">{error}</p>}
         </div>
       )}
 
