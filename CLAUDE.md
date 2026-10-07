@@ -146,7 +146,7 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 - אין ישות `Child` — פרטי הילד ברמת התור (`attendee_name`, `attendee_type`).
 - **שלוש פעולות נפרדות על תור/יום — אל תתבלבלו:**
   1. **ביטול תור בודד** (`cancelAppointmentAction`) — soft: `status = cancelled`, הרשומה נשארת.
-  2. **מחיקת יום/יומן** (`deleteWorkDayAction`/`deleteAllWorkDaysAction`) — hard delete אמיתי (cascade), לא ארכיון.
+  2. **מחיקת יום / מחיקת היסטוריה** (`deleteWorkDayAction`/`deleteHistoryAction`) — hard delete אמיתי (cascade), לא ארכיון. (`deleteAllWorkDaysAction` הוסרה 2026-10-07.)
   3. **חסימת יום** (`WorkDay.is_blocked`, `setWorkDayBlockedAction`) — לא מוחקת ולא מבטלת; חוסמת רק קביעה/שינוי **חדשים של לקוחות**; הפיכה (טוגל). שונה גם מ-`BlockedTime` (טווח שעות בתוך יום).
 - לכל תור: בקשת ביטול (`CancellationRequest`) אחת לכל היותר — `appointment_id @unique`, לכן בקשה שנדחתה חוזרת ל-`pending` בבקשה נוספת במקום שורה חדשה; ובקשת תור (`BookingRequest`) אחת לכל היותר.
 - `BookingRequest` אינה "כוונה": ה-`Appointment` נוצר מיד כ-`scheduled` ותופס את השעה; דחייה → `cancelled` ושחרור השעה; אישור לא נוגע בתור. אין `booking_request_id` ב-`Notification` — `booking_decision` מצביעה על `appointment_id`.
@@ -169,7 +169,7 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
   - כבויה: שניהם קורים **מיידית**. אל תניחו שביטול/קביעה תמיד דורשים אישור — בדקו `getRequiresApproval()`.
 - **חסימת יום** נאכפת בשלוש שכבות: `getOpenDates()` (לא מציגה), `bookAppointmentAction`/`rescheduleAppointmentAction` (זורקות `DAY_BLOCKED`). לא חל על קביעה ידנית של הספר.
 - **חסימת מספרי טלפון** (`BlockedPhoneNumber`) נאכפת בהרשמה, בכניסה (שליחת קוד ואימות), בקביעה ובשינוי תור — גם למספרים שטרם נרשמו.
-- **הודעת ביטול על תור — תמיד לבדוק `starts_at >= new Date()`** ולא רק `status === "scheduled"` (תקלה אמיתית שתוקנה ב-`deleteWorkDayAction`/`deleteAllWorkDaysAction`/`cancelAppointmentAction`: תור היסטורי עלול לגרום להודעת "בוטל" מטעה).
+- **הודעת ביטול על תור — תמיד לבדוק `starts_at >= new Date()`** ולא רק `status === "scheduled"` (תקלה אמיתית שתוקנה ב-`deleteWorkDayAction`/`deleteAllWorkDaysAction` (הוסרה מאז)/`cancelAppointmentAction`: תור היסטורי עלול לגרום להודעת "בוטל" מטעה).
 - מחיקת יום/תור דורשת הודעת אזהרה ואישור מפורש.
 - איפוס סיסמה — קוד חד-פעמי ב-SMS, לא מייל (רלוונטי רק במצב `password`).
 - הרשאות: מסכי ניהול רק ל-`administrator`; לקוח לא מחובר לא יכול לערוך תורים. `account/appointments` מסנן `starts_at >= now` — הלקוח לא רואה תורי עבר.
@@ -214,7 +214,8 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 - **"היום הרלוונטי":** `getWorkDaysAdmin` מסנן לפי `ends_at >= now()` (לא לפי תאריך בלבד) — יום ששעותיו הסתיימו נעלם מהתצוגה המהירה וגם מרשימת "ימי עבודה פתוחים" (לא נמחק מה-DB). `workDays[0]` = היום הפתוח האמיתי הבא.
 - **`QuickDayAppointments`** (`admin/QuickDayAppointments.tsx`) — רכיב משותף למסך הראשי ול-`/admin/day/[id]` (עם `showMoveButton`): ציר זמן (`buildDayTimeline`) עם "ביטול תור" לכל תור ו"קביעת תור ידני" לכל שעה פנויה (פותח `CreateManualAppointmentForm` inline עם `initialStartsAt`/`onCancel`). **מ-2026-10-05 טווחים פנויים מפוצלים לשעות בודדות** (`splitFreeSegments`, רשת 10 דקות כמו אצל לקוח, כל שעה מוצגת בזמן ההתחלה שלה).
 - כפתורי פעולה קטנים אחידים: `bg-barber-teal text-cream-text rounded-full px-3 py-1 text-xs font-medium`. שעה פנויה: `text-ink font-bold` עם המילה "פנוי" בלבד באדום (`text-red-600`).
-- `DeleteAllWorkDaysButton` באותה שורה עם "תפריט", אותו מידות, באדום.
+- **מחיקת היסטוריה** (`DeleteHistoryMenuItem` → `deleteHistoryAction`, בתוך `AdminMenu`; מ-2026-10-07) — מוחקת ימים/תורים שעברו בלבד. כפתור "מחיקת כל היומן" (`DeleteAllWorkDaysButton`/`deleteAllWorkDaysAction`) הוסר.
+- **רענון אוטומטי (2026-10-07):** `admin/layout.tsx` מציג `AdminAutoRefresh` — `router.refresh()` כל 45 שניות כשהטאב גלוי, ומיד כשחוזרים אליו (`visibilitychange`). ה-badge (`getUnreadAdminNotificationCount`) והרשימות נספרים בשרת בטעינה, ולכן בלי זה מנהל עם דף פתוח לא רואה התראה חדשה עד רענון ידני. מצב הטפסים בצד לקוח נשמר. זה **גיבוי** ל-Push, לא תחליף לו (טאב סגור — לא קורה כלום).
 
 ### ימי עבודה
 - פתיחת יום (תאריך, שעות, הפסקות דינמיות); **עדכון שעות** של יום פתוח (נחסם אם יש תור/הפסקה/חסימה מחוץ לטווח החדש); צפייה בתורי יום (`/admin/day/[id]`).
@@ -259,6 +260,8 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 - מודל `PushSubscription` (`user_id`, `endpoint` ייחודי, `p256dh`/`auth`) — מכשיר אחד לשורה; תקרת 10 מכשירים למשתמש; `subscribeToPushAction` פתוחה לכל משתמש מחובר, עם אימות `endpoint` מול allowlist של שירותי push אמיתיים (`lib/pushEndpoint.ts` — מונע SSRF).
 - **קוד השליחה ב-`packages/db/src/push.ts`** (`sendPushToAdmins`/`sendPushToUser`/`sendPushToCustomers`, מיוצאים מ-`@barberbook/db`) כדי ש-web וגם worker ישתמשו באותו קוד. הפונקציות **לא זורקות לעולם**, no-op שקטה בלי VAPID, ורושמות `[push] delivery failed <status>` לכשל שאינו 404/410. `prisma` ב-`packages/db/src/client.ts` (מניעת import מעגלי).
 - `<PushNotificationToggle audience="customer" | admin/>` ב-`/account` וב-`/admin/notifications`; ב-iOS נדרשת התקנה למסך הבית לפני ש-Web Push עובד (Android/Desktop לא).
+- **ריפוי מנוי (2026-10-07):** בכל כניסה לדף עם הכפתור, פעם אחת בכל סשן של טאב (`healSubscription`), הכפתור שולח שוב את המנוי לשרת (upsert אידמפוטנטי) ואם מפתח ה-VAPID של המנוי ישן (`lib/pushKey.ts`) — נרשם מחדש. מטפל במצב שבו הכפתור מציג "פעיל" אבל השורה בשרת נמחקה (404/410) או שהמפתח הוחלף בפריסה.
+- **אבחון כשהתראות למכשיר לא מגיעות** (נבדק 2026-10-07 בפרודקשן): ההתראה נרשמת ב-`Notification` גם בלי Push, כך שאפשר להפריד בין "לא נוצרה" ל"לא הוצגה". לבדוק לפי הסדר: שורת `push_subscriptions` של המנהל קיימת · `VAPID_*` מוגדרים בקונטיינר `web` בזמן ריצה (חסר → השליחה מדלגת בשקט ובלי לוג) · שליחה ישירה למנוי מחזירה 201 · ואם כל זה תקין ועדיין לא מוצג — התקלה במכשיר; מה שפתר בפועל: מחיקת האפליקציה/ניקוי נתונים, התקנה מחדש והפעלת המתג. 201 מ-FCM מוכיח רק שגוגל קיבלה, לא שהמכשיר הציג.
 - ה-worker צריך את `VAPID_*` ב-`apps/worker/.env` (ב-Docker `env_file` משותף).
 
 ### התראות לספר (`notifyAdmin.ts`, helper אחד `notifyAdmins`)
