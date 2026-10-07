@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { subscribeToPushAction, unsubscribeFromPushAction } from "@/lib/actions/push";
 import { isIos, isIosStandalone } from "@/lib/ios";
+import { subscriptionUsesKey, urlBase64ToUint8Array } from "@/lib/pushKey";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
@@ -10,12 +11,48 @@ function isStandaloneIos() {
   return isIos() && !isIosStandalone();
 }
 
-// PushManager.subscribe needs the VAPID key as raw bytes, not the base64url string it's stored as.
-function urlBase64ToUint8Array(base64Url: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64Url.length % 4)) % 4);
-  const base64 = (base64Url + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = atob(base64);
-  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+async function saveSubscription(subscription: PushSubscription) {
+  const json = subscription.toJSON();
+  return subscribeToPushAction({
+    endpoint: json.endpoint!,
+    keys: { p256dh: json.keys!.p256dh, auth: json.keys!.auth },
+  });
+}
+
+/**
+ * The browser's own subscription is what decides "on", but the server row and the VAPID key can
+ * drift from it (row deleted after a 404/410, key changed by a deploy) — the toggle then says "on"
+ * while nothing arrives and the barber has to switch it off and on by hand (2026-10-07). So on every
+ * visit, once per tab session: re-subscribe if the key is stale, otherwise re-send the subscription
+ * (an idempotent upsert). Returns whether the device is still subscribed afterwards.
+ */
+async function healSubscription(registration: ServiceWorkerRegistration, existing: PushSubscription): Promise<boolean> {
+  const key = urlBase64ToUint8Array(VAPID_PUBLIC_KEY!);
+  if (subscriptionUsesKey(existing.options.applicationServerKey, key)) {
+    await saveSubscription(existing);
+    return true;
+  }
+  await unsubscribeFromPushAction(existing.endpoint);
+  await existing.unsubscribe();
+  const fresh = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: key as BufferSource,
+  });
+  return !(await saveSubscription(fresh)).error;
+}
+
+const HEALED_FLAG = "push-subscription-healed";
+async function alreadyHealedThisSession() {
+  try {
+    return sessionStorage.getItem(HEALED_FLAG) === "1";
+  } catch {
+    return false;
+  }
+}
+function markHealedThisSession() {
+  try {
+    sessionStorage.setItem(HEALED_FLAG, "1");
+  } catch {}
 }
 
 type Status = "checking" | "unsupported" | "ios-not-installed" | "off" | "on" | "denied";
@@ -52,7 +89,16 @@ export function PushNotificationToggle({ audience }: { audience: "admin" | "cust
       }
       const registration = await navigator.serviceWorker.ready;
       const existing = await registration.pushManager.getSubscription();
-      setStatus(existing ? "on" : "off");
+      if (existing && !(await alreadyHealedThisSession())) {
+        try {
+          setStatus((await healSubscription(registration, existing)) ? "on" : "off");
+          markHealedThisSession();
+          return;
+        } catch {
+          // Offline or the server action failed: fall through to what the browser says now; retry next visit.
+        }
+      }
+      setStatus((await registration.pushManager.getSubscription()) ? "on" : "off");
     }
     check().catch(() => setStatus("unsupported"));
   }, []);
@@ -72,11 +118,7 @@ export function PushNotificationToggle({ audience }: { audience: "admin" | "cust
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
       });
-      const json = subscription.toJSON();
-      const result = await subscribeToPushAction({
-        endpoint: json.endpoint!,
-        keys: { p256dh: json.keys!.p256dh, auth: json.keys!.auth },
-      });
+      const result = await saveSubscription(subscription);
       if (result.error) {
         setError(result.error);
         return;
