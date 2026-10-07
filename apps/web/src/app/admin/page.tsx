@@ -10,12 +10,12 @@ import { getUnreadAdminNotificationCount } from "@/lib/actions/adminNotification
 import { getPendingBookingRequestCount } from "@/lib/actions/bookingRequests";
 import { buildDayTimeline } from "@/lib/dayTimeline";
 import { OpenWorkDayForm } from "./OpenWorkDayForm";
-import { DeleteAllWorkDaysButton } from "./DeleteAllWorkDaysButton";
 import { QuickDayAppointments } from "./QuickDayAppointments";
 import { BlockDayToggle } from "./day/[id]/BlockDayToggle";
 import { PageHeader } from "@/components/PageHeader";
 import { AdminBrandHero } from "@/components/AdminBrandHero";
 import { AdminMenu } from "@/components/AdminMenu";
+import { DeleteHistoryMenuItem } from "./DeleteHistoryMenuItem";
 
 function formatWorkDate(d: Date) {
   return d.toLocaleDateString("he-IL", {
@@ -73,11 +73,12 @@ export default async function AdminPage({
             { href: "/admin/blocked-customers", label: "לקוחות חסומים" },
             { href: "/admin/waitlist", label: "רשימת המתנה" },
             { href: "/admin/announcements", label: "הודעות כלליות" },
+            { href: "/admin/print-all", label: "היסטוריה וגיבוי" },
             { href: "/admin/settings", label: "הגדרות" },
             { href: "/admin/barbers", label: "ניהול ספרים" },
           ]}
+          footer={<DeleteHistoryMenuItem />}
         />
-        <DeleteAllWorkDaysButton barberId={selectedBarber.id} barberName={selectedBarber.full_name} />
       </div>
 
       {barbers.length > 1 && (
@@ -181,13 +182,6 @@ export default async function AdminPage({
             </li>
           ))}
         </ul>
-      </div>
-
-      <div className="border-barber-teal bg-white flex flex-col gap-2 rounded-xl border p-4">
-        <h2 className="text-ink font-bold">היסטוריה וגיבוי</h2>
-        <Link href="/admin/print-all" className="text-barber-teal text-sm underline">
-          הדפסה / שמירת עותק כ-PDF של כל היומן
-        </Link>
       </div>
 
       <form action={logoutAction}>

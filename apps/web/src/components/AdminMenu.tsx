@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 export type AdminMenuItem = { href: string; label: string; count?: number };
 
@@ -13,7 +13,7 @@ export type AdminMenuItem = { href: string; label: string; count?: number };
  * centered — the panel hangs from the button's right edge via `right-0`
  * instead of the old centered left-1/2/-translate-x-1/2.
  */
-export function AdminMenu({ items }: { items: AdminMenuItem[] }) {
+export function AdminMenu({ items, footer }: { items: AdminMenuItem[]; footer?: ReactNode }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -46,6 +46,7 @@ export function AdminMenu({ items }: { items: AdminMenuItem[] }) {
                 )}
               </Link>
             ))}
+            {footer}
           </div>
         </>
       )}

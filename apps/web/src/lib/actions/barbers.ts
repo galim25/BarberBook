@@ -90,7 +90,7 @@ export async function setBarberActiveAction(
  * is onDelete: Restrict, so the barber's work days must be cleared first;
  * wrapped in a transaction with the barber delete so the two can't succeed
  * only one at a time. Reuses the same "notify customers with a future
- * appointment" behavior as deleteAllWorkDaysAction (workdays.ts) since this
+ * appointment" behavior as deleteWorkDayAction (workdays.ts) since this
  * wipes the same data, just scoped to one barber and finished by removing
  * the Barber row itself.
  */

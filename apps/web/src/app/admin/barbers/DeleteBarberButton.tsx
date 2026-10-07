@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { deleteBarberAction } from "@/lib/actions/barbers";
 
-/** Same double-confirm delete pattern as DeleteAllWorkDaysButton (admin/DeleteAllWorkDaysButton.tsx) — never shown for the primary barber (checked by the caller). */
+/** Same double-confirm delete pattern — never shown for the primary barber (checked by the caller). */
 export function DeleteBarberButton({ barberId, barberName }: { barberId: string; barberName: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);

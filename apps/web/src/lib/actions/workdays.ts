@@ -294,32 +294,20 @@ export async function deleteWorkDayAction(
   return { success: true };
 }
 
-/** Same as deleteWorkDayAction but wipes every work day for one barber — the "מחיקת כל היומן" bulk purge, scoped to whichever barber's calendar is currently selected on /admin. */
-export async function deleteAllWorkDaysAction(
-  barber_id: string,
-  notifyCustomers: boolean,
-): Promise<CreateWorkDayResult> {
+/**
+ * "מחיקת היסטוריה" — permanently deletes everything up to this moment, across all barbers:
+ * every appointment that already started, plus work days that have already ended. Never
+ * touches the future (a work day still in progress keeps its upcoming appointments), so
+ * no customer is notified — nothing active is cancelled.
+ */
+export async function deleteHistoryAction(): Promise<CreateWorkDayResult> {
   if (!(await requireAdminSession())) return { error: "אין הרשאה" };
 
-  if (notifyCustomers) {
-    const appointments = await prisma.appointment.findMany({
-      where: { status: "scheduled", starts_at: { gte: new Date() }, work_day: { barber_id } },
-      include: { service: true, booked_by: true },
-    });
-
-    for (const a of appointments) {
-      if (a.booked_by) {
-        await notifyAppointmentCancelled({
-          user_id: a.booked_by.id,
-          phone_number: a.booked_by.phone_number,
-          service_name: a.service.name,
-          starts_at: a.starts_at,
-        });
-      }
-    }
-  }
-
-  await prisma.workDay.deleteMany({ where: { barber_id } });
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.appointment.deleteMany({ where: { starts_at: { lt: now } } }),
+    prisma.workDay.deleteMany({ where: { ends_at: { lt: now } } }),
+  ]);
 
   revalidatePath("/admin");
   return { success: true };
