@@ -47,7 +47,11 @@ export async function proxy(request: NextRequest) {
   // gets a freshly re-signed token with a renewed 30-day window, so an
   // actively-returning customer/admin is never logged out by calendar time
   // alone — only by real inactivity beyond the window, or explicit logout.
-  if (session) {
+  // Re-signing only when the token is over a day old keeps the window effectively the same
+  // (an inactivity gap up to ~29 days still survives) without rewriting the cookie on every request.
+  const REFRESH_AFTER_SECONDS = 24 * 60 * 60;
+  const tokenAge = session?.iat ? Math.floor(Date.now() / 1000) - session.iat : Infinity;
+  if (session && tokenAge >= REFRESH_AFTER_SECONDS) {
     const freshToken = await signSession(session);
     response.cookies.set(SESSION_COOKIE, freshToken, {
       httpOnly: true,

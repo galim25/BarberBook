@@ -34,25 +34,31 @@ export async function sendDueReminders(): Promise<void> {
   for (const appointment of appointments) {
     if (!appointment.booked_by) continue;
 
-    const message = `תזכורת: יש לך תור ל${appointment.service.name} בתאריך ${formatIsraelDate(appointment.starts_at)} בשעה ${formatIsraelTime(appointment.starts_at)}.`;
+    // One failing reminder (e.g. the SMS provider throwing) must not stop the rest of the batch.
+    // No Notification row is written on failure, so the next poll retries this appointment.
+    try {
+      const message = `תזכורת: יש לך תור ל${appointment.service.name} בתאריך ${formatIsraelDate(appointment.starts_at)} בשעה ${formatIsraelTime(appointment.starts_at)}.`;
 
-    await getSmsProvider().send(appointment.booked_by.phone_number, message);
-    await prisma.notification.create({
-      data: {
-        user_id: appointment.booked_by.id,
-        appointment_id: appointment.id,
-        type: "appointment_reminder",
-        content: message,
-        status: "sent",
-        sent_at: new Date(),
-      },
-    });
-    // Creating the Notification row above is what marks this reminder as sent (idempotency), so the
-    // push is best-effort: sendPushToUser never throws and a customer with no subscribed device just gets no push.
-    await sendPushToUser(appointment.booked_by.id, {
-      title: "תזכורת לתור",
-      body: message,
-      url: "/account/appointments",
-    });
+      await getSmsProvider().send(appointment.booked_by.phone_number, message);
+      await prisma.notification.create({
+        data: {
+          user_id: appointment.booked_by.id,
+          appointment_id: appointment.id,
+          type: "appointment_reminder",
+          content: message,
+          status: "sent",
+          sent_at: new Date(),
+        },
+      });
+      // Creating the Notification row above is what marks this reminder as sent (idempotency), so the
+      // push is best-effort: sendPushToUser never throws and a customer with no subscribed device just gets no push.
+      await sendPushToUser(appointment.booked_by.id, {
+        title: "תזכורת לתור",
+        body: message,
+        url: "/account/appointments",
+      });
+    } catch (err) {
+      console.error(`[worker] reminder for appointment ${appointment.id} failed:`, err);
+    }
   }
 }

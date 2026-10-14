@@ -126,11 +126,32 @@ export async function getEarliestAvailability(
   barber_id: string,
   service_id: string,
 ): Promise<EarliestAvailability | null> {
-  const openDates = await getOpenDates(barber_id);
-  for (const day of openDates) {
-    const slots = await getSlotsForDate(day.work_day_id, service_id);
+  const service = await prisma.service.findUniqueOrThrow({ where: { id: service_id } });
+  const today = localDateToUtcMidnight();
+  // One query for all open days (same filter/order as getOpenDates) instead of one per day.
+  const days = await prisma.workDay.findMany({
+    where: { barber_id, work_date: { gte: today }, is_blocked: false },
+    orderBy: { work_date: "asc" },
+    include: {
+      breaks: true,
+      blocked_times: true,
+      appointments: { where: { status: "scheduled" } },
+    },
+  });
+  const now = new Date();
+  for (const day of days) {
+    const busy: Interval[] = [
+      ...day.breaks.map((b) => ({ starts_at: b.starts_at, ends_at: b.ends_at })),
+      ...day.blocked_times.map((b) => ({ starts_at: b.starts_at, ends_at: b.ends_at })),
+      ...day.appointments.map((a) => ({ starts_at: a.starts_at, ends_at: a.ends_at })),
+    ];
+    const slots = findAvailableSlots({
+      work_day: { starts_at: day.starts_at, ends_at: day.ends_at },
+      busy,
+      duration_minutes: service.duration_minutes,
+    }).filter((d) => d >= now);
     if (slots.length > 0) {
-      return { work_day_id: day.work_day_id, starts_at: slots[0] };
+      return { work_day_id: day.id, starts_at: slots[0].toISOString() };
     }
   }
   return null;

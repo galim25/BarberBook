@@ -48,7 +48,9 @@ const SEND_GLOBAL = { maxAttempts: 100, windowMs: 60 * MINUTE };
 const VERIFY_PER_PHONE = { maxAttempts: 10, windowMs: 15 * MINUTE };
 
 async function clientIp(): Promise<string> {
-  const forwarded = (await headers()).get("x-forwarded-for");
+  const h = await headers();
+  // nginx overwrites both with the real peer address (nginx/templates); never trust a client-supplied chain.
+  const forwarded = h.get("x-real-ip") ?? h.get("x-forwarded-for");
   return forwarded?.split(",")[0]?.trim() || "unknown";
 }
 

@@ -228,6 +228,7 @@ model Appointment {
   @@index([work_day_id])
   @@index([service_id])
   @@index([booked_by_user_id])
+  @@index([status, starts_at])
   @@map("appointments")
 }
 

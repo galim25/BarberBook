@@ -32,6 +32,8 @@ export type SessionPayload = {
   sub: string;
   role: UserRole;
   full_name: string;
+  /** Issued-at (seconds); only present on a payload read back from a token. */
+  iat?: number;
 };
 
 export async function signSession(payload: SessionPayload): Promise<string> {
@@ -50,6 +52,7 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
       sub: payload.sub as string,
       role: payload.role as UserRole,
       full_name: payload.full_name as string,
+      iat: payload.iat,
     };
   } catch {
     return null;
