@@ -2,7 +2,7 @@
 
 אפליקציה לניהול תורים עבור ספר עצמאי. לקוחות קובעים, משנים ומבקשים לבטל תורים בעצמם (באפליקציה או בטלפון) לפי הזמינות שהספר מגדיר; הספר מנהל את היומן במלואו מתוך מסך ניהול.
 
-> **עודכן לאחרונה: 2026-10-07** — המסמך סודר מחדש לפי קטגוריות ועודכן מול הקוד וההיסטוריה (62 commits). הגרסה הקודמת (לא מסודרת) נשמרה ב-`docs/archive/CLAUDE.md.bak-2026-10-06`.
+> **עודכן לאחרונה: 2026-10-14** (סקירת קוד: עמידות worker, אמון ב-IP, חידוש סשן, אינדקס — ראו סעיפים 4, 9, 10, 12) · קודם 2026-10-07 — המסמך סודר מחדש לפי קטגוריות ועודכן מול הקוד וההיסטוריה (62 commits). הגרסה הקודמת (לא מסודרת) נשמרה ב-`docs/archive/CLAUDE.md.bak-2026-10-06`.
 
 ## תוכן עניינים
 
@@ -53,7 +53,7 @@
 ### פתוח / לא נבדק
 - **פרודקשן אמיתי (Docker, `yossibarberbook.co.il`):** כניסה בקוד SMS **לא נפרסה** לפי המידע האחרון (2026-09-22) — דורשת `pnpm db:migrate` (migrations `20260922130000_add_login_codes` ואילך) והגדרת `CUSTOMER_LOGIN_MODE`/`SMS_PROVIDER`/פרטי 019sms ב-`.env` שם. מצב ההעברה לשרת החדש מתועד ב-`docs/DEPLOY.md`; לאמת מול השרת לפני הנחות.
 - **IVR:** נבדק מול שיחות אמיתיות כולל **כתיבת תור בפועל** (2026-08-08). **לא נבדק:** סימון "נקבע בטלפון" אצל הספר (רק `tsc`/טסטים), שילוב IVR + כניסת SMS, והפניית ה-`api_link` בימות המשיח לדומיין האמיתי בפרודקשן (DEPLOY שלב 5) — לא אומת שבוצעה.
-- **worker:** `pnpm build` (`tsc`) + `node dist/index.js` לא עובד (ראו סעיף 4) — רץ דרך `tsx`. בשרת הפיתוח רץ תחת pm2 בשם `barberbook-worker`; **`pm2 save` לא הורץ**, אז לא ישרוד אתחול שרת.
+- **worker:** `pnpm build` (`tsc`) + `node dist/index.js` לא עובד (ראו סעיף 4) — רץ דרך `tsx`. בשרת הפיתוח רץ תחת pm2 בשם `barberbook-worker`; `pm2 save` הורץ 2026-10-14 (ה-dump כולל גם `barberbook-web` וגם את ה-worker) — ישרוד אתחול שרת.
 - **איפוס סיסמה** (`forgotPasswordAction`) לא שולח כלום ב-`password` mode (`getSmsProvider()` הוא Noop). ב-`sms_code` mode הוא סגור ממילא.
 - **אין revocation לסשן** בעת reset סיסמה (JWT stateless) — דורש החלטה אדריכלית (ראו סעיף 12).
 - **בדיקה ידנית בדפדפן שטרם נעשתה:** FR-28 (שעה שעברה נעלמת מהרשימה), US-025 (הודעת הרחבת שעות אמיתית), מתג `notify_freed_slots`.
@@ -106,6 +106,7 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 ### הרצה ו-build
 - **`pnpm dev` / `pnpm build` בלבד — לעולם לא `next build`/`next dev` ישירות.** Next 16 משתמש ב-Turbopack כברירת מחדל ו-Serwist (webpack) מתנגש איתו; `apps/web/package.json` מגדיר `next dev --webpack` ו-`next build --webpack`. בלי הדגל `dev` קורס ("This build is using Turbopack, with a `webpack` config…").
 - `pnpm test` (בתוך `apps/web`) — `node --import tsx --test src/**/*.test.ts`. טסטים קיימים: `availability`, `dayTimeline`, `contacts`, `pushEndpoint`, `sms019`, `smsLoginCore`.
+- **אתחול שרת הפיתוח (pm2):** `pm2` לא ב-PATH — נמצא ב-cache של npx: `~/.npm/_npx/5f7878ce38f1eb13/node_modules/.bin/pm2` (או `npx pm2`). נוהל: `pnpm build` מתוך `apps/web` (בדיקה קודם ש-`pgrep -af "next build"` ריק) → `pm2 restart barberbook-web barberbook-worker` → `pm2 save` → בדיקת `/login` = 200 ולוגים נקיים. שרת זה הוא שרת פיתוח (ה-IVR מופנה אליו דרך ngrok); הפרודקשן האמיתי ב-Docker, ראו `docs/DEPLOY.md`.
 - **worker:** `pnpm build`/`node dist/index.js` לא עובד כי `packages/*` הם TS גולמי ו-Node CommonJS לא מפענח אותם. מריצים דרך `pnpm exec tsx --env-file=.env src/index.ts` (בלי `--watch` לריצה ארוכה); `pnpm worker` מהשורש = `tsx watch` לפיתוח. דורש `apps/worker/.env` עם `DATABASE_URL` (+ `VAPID_*` לפוש). זה dev-runtime ולא בינארי מקומפל — וזה בסדר, גם ב-Docker.
 - **תיקון timezone:** Server Components רצים בשעון השרת, לא בישראל. כל תצוגת זמן חייבת `ISRAEL_TIME_ZONE` מפורש; `zonedTimeToUtc()` (`packages/shared`) ממיר שעון קיר ישראלי (כולל שעון קיץ/חורף, בלי ספריית tz) ל-UTC לכל טפסי הניהול. `formatIsraelDate`/`formatIsraelTime` ב-`packages/shared` (משותפים ל-web ול-worker).
 - `runSerializable()` ב-`apps/web/src/lib/serializableTransaction.ts` (לא בקובץ `"use server"`) — טרנזקציות Serializable לקביעה/שינוי תור.
@@ -136,6 +137,8 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 ## 5. מודל נתונים
 
 מקור האמת: `packages/db/prisma/schema.prisma`; תיעוד מלא: `docs/# ERD BarberBook.txt`. שמות שדות snake_case, 1:1 מול ה-ERD.
+
+**אינדקס (2026-10-14):** `Appointment @@index([status, starts_at])` (migration `20261014120000_add_appointment_status_starts_at_index`) — משרת את שאילתת התזכורות של ה-worker שרצה כל דקה. `getEarliestAvailability` (IVR) טוענת את כל הימים הפתוחים בשאילתה אחת עם `breaks`/`blocked_times`/`appointments` במקום שאילתה לכל יום, באותה לוגיקת `findAvailableSlots`.
 
 **ישויות:** `User` (role: customer/administrator) · `Barber` (`is_primary`, `is_active`) · `Service` (`duration_minutes`, `is_child_service`, `is_manual_only`) · `WorkDay` (`barber_id`, `is_blocked`) · `WorkBreak` · `BlockedTime` · `Appointment` (status: scheduled/cancelled; attendee_type: self/child/other; `booked_via_ivr`) · `CancellationRequest` · `BookingRequest` · `AppSettings` (סינגלטון: `requires_approval`, `ivr_enabled`) · `WaitlistEntry` (`notify_freed_slots`) · `Notification` · `PushSubscription` · `Announcement` · `BlockedPhoneNumber` · `PasswordResetCode` · `LoginCode` · `ContactName`.
 
@@ -270,7 +273,7 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 - כשהמדיניות כבויה כל תור שלקוח קובע יוצר `appointment_booked` לכל מנהל (תור ידני — לא). badge ב-`/admin` סופר `read_at IS NULL`; `markAdminNotificationsReadAction` = "סמן הכל כנקרא" (`updateMany`), אין סימון פר-שורה. `adminNotifications.ts` מסנן לפי `ADMIN_NOTIFICATION_TYPES` (באג שתוקן: בעבר סינן רק `appointment_booked` ולכן בקשות ממתינות לא הופיעו).
 
 ### התראות ללקוח
-שינוי/ביטול תור ע"י הספר (כולל מחיקת יום/יומן/ספר) · החלטה על בקשת תור/ביטול · רשימת המתנה · **תזכורת לפני תור** (worker, `reminders.ts`: כל דקה, תורים `scheduled` עם חשבון שמתחילים בתוך `APPOINTMENT_REMINDER_LEAD_MINUTES` = 120 דק' וללא `Notification` מסוג `appointment_reminder` — האידמפוטנטיות מסתמכת רק על הבדיקה הזו; Notification+Push).
+שינוי/ביטול תור ע"י הספר (כולל מחיקת יום/יומן/ספר) · החלטה על בקשת תור/ביטול · רשימת המתנה · **תזכורת לפני תור** (worker, `reminders.ts`: כל דקה, תורים `scheduled` עם חשבון שמתחילים בתוך `APPOINTMENT_REMINDER_LEAD_MINUTES` = 120 דק' וללא `Notification` מסוג `appointment_reminder` — האידמפוטנטיות מסתמכת רק על הבדיקה הזו; Notification+Push. **מ-2026-10-14** כל תור בלולאה בתוך `try/catch` משלו — כשל שליחה אחד לא עוצר את השאר, ואין Notification נכתב ולכן נוסה שוב בדקה הבאה).
 
 ### רשימת המתנה — שלושה טריגרים (`notifyAllWaitlistEntries`, `type: waitlist_slot_available`)
 1. **`notifyWaitlistOfFreedSlot(starts_at, service, owner_user_id)`** — תור עתידי שהתפנה: ביטול ישיר ע"י הספר, אישור/ביטול מיידי של בקשת ביטול, דחיית בקשת תור, **וגם העברת תור (ע"י לקוח או ספר) — השעה הישנה שהתפנתה** (נוסף 2026-10-05, commit `542d4e0`; מותנה בכך שהשעה הישנה עתידית ושונתה בפועל; כשל התראה נרשם בלוג ולא מכשיל את ההעברה). בעל התור מוחרג. **נשלח רק לחברי הרשימה שהשאירו דלוק `WaitlistEntry.notify_freed_slots`** (ברירת מחדל `true`; מתג "התראה כשמתפנה תור" ב-`/account`, `FreedSlotNotifyToggle`) — **שונה 2026-10-06**: עד אז נשלח גם לכל לקוח עם Push, וזה בוטל.
@@ -295,7 +298,7 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 - זרימה: `smsLoginAction` (`lib/actions/smsLogin.ts`, שלבים `send`/`verify`/`signup`); לוגיקת הקודים ב-`lib/smsLoginCore.ts` (לא `"use server"`); UI ב-`login/SmsLoginForm.tsx`.
 - קודים: `randomInt`, נשמר רק HMAC-SHA256 עם `SESSION_SECRET` בטבלה `login_codes`, חד-פעמי, תוקף `LOGIN_CODE_TTL_MINUTES` (10), `LOGIN_CODE_MAX_ATTEMPTS` (5) ואז נעילה, קוד חדש מבטל ישנים. ה-SMS מציב את **הקוד בתחילת ההודעה** כדי שיופיע בבאנר ההתראה.
 - מספר חדש עובר לשלב שם עם **הוכחה חתומה** (JWT 10 דק') — העובדה "המספר הזה הוא/לא לקוח" לא נחשפת לפני שהוכח שהמספר שלו. נוצר `User` עם סיסמה אקראית לא-שמישה (כמו לקוחות IVR) + התראת "לקוח חדש" לספר.
-- מגבלות קצב (`rateLimit.ts`, in-memory): שליחה — 3 ל-15 דק' למספר, 10 לשעה ל-IP, **100 לשעה גלובלית** (תקרת עלות מול SMS-pumping); אימות — 10 ל-15 דק' למספר.
+- מגבלות קצב (`rateLimit.ts`, in-memory): שליחה — 3 ל-15 דק' למספר, 10 לשעה ל-IP (ה-IP נלקח מ-`x-real-ip` ואחריו `x-forwarded-for`; nginx מגדיר את שניהם ל-`$remote_addr` — ראו סעיף 12), **100 לשעה גלובלית** (תקרת עלות מול SMS-pumping); אימות — 10 ל-15 דק' למספר.
 - נסגר במצב זה: `/register`, `/forgot-password`, `/reset-password` מפנים ל-`/login` (ב-`proxy.ts`) וה-actions מסרבות גם בקריאה ישירה; `loginAction` מקבלת רק מנהל; `/admin` ללא סשן מפנה ל-`/login/admin`.
 - ה-worker מוחק קודים שפג תוקפם מעל יממה (cron יומי 03:17, `cleanup.ts`).
 - **ספק:** `Sms019Provider` (`packages/shared/src/sms019.ts`; `POST https://019sms.co.il/api`, Bearer token, `source` עד 11 תווים, מאושר `BarberBook`); ימות המשיח נפסל (אין endpoint נקי ל-SMS בודד). החלפת ספק = מימוש `SmsProvider` + `case` ב-`getOtpSmsProvider()`.
@@ -304,7 +307,7 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 `/login/admin` קיים בשני המצבים; מספר המנהל פשוט/ידוע ולכן **אסור** לאפשר לו כניסה בקוד/טלפון בלבד. למספר מנהל, שלב ה"שליחה" מדמה הצלחה בלי לשלוח וליצור קוד.
 
 ### סשן "זכור אותי" (sliding, 2026-08-09)
-`proxy.ts` מרעננת את עוגיית הסשן (`signSession` עם `iat`/`exp` חדשים) בכל בקשה מאומתת ל-`/account/*`/`/admin/*` — חלון 30 יום מתחדש מכל ביקור; רק חוסר פעילות מעל 30 יום או logout מפורש מנתקים. `cookieSecure()` ב-`jwt.ts` (edge-safe, בלי `server-only`) כדי ש-`proxy.ts` ישתמש בו.
+`proxy.ts` מרעננת את עוגיית הסשן (`signSession` עם `iat`/`exp` חדשים) בכל בקשה מאומתת ל-`/account/*`/`/admin/*` — חלון 30 יום מתחדש מכל ביקור (**2026-10-14:** הטוקן נחתם מחדש רק אם עברו מעל 24 שעות מה-`iat` שלו, ולא בכל בקשה — סבילות לפער ביקורים של כ-29 יום; `verifySessionToken` מחזיר גם `iat`); רק חוסר פעילות מעל 30 יום או logout מפורש מנתקים. `cookieSecure()` ב-`jwt.ts` (edge-safe, בלי `server-only`) כדי ש-`proxy.ts` ישתמש בו.
 **`COOKIE_SECURE`** (`.env`) עוקף את ברירת המחדל (`NODE_ENV === "production"`) לדגל `Secure`: `next start` תמיד production, וללא HTTPS אמיתי הדפדפן זורק בשקט עוגיית `Secure` — כניסה "לא עובדת" בלי שגיאה. להשאיר `false` כל עוד HTTP גולמי (IP:פורט), ו-`true`/ללא משתנה כשיש HTTPS.
 
 ---
@@ -345,7 +348,8 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 - ברירת מחדל סגורה: פעולת אדמין חדשה חייבת `requireAdmin()`/`requireAdminSession()`.
 - אל תדפיסו OTP/סיסמה/טוקן ל-console — `MockSmsProvider` (`packages/shared/src/sms.ts`) כבר עושה redact לקודים; לא לרשום טלפון/תוכן הודעה בלוג.
 - זרימות אימות (login, reset, שליחה/אימות קוד) עוברות דרך `lib/rateLimit.ts` (in-memory, per-process — מוגבל בפריסה מרובת-אינסטנסים; ראו הערה בקובץ). כל endpoint חדש שמנחש credential חייב rate limit דומה.
-- ידוע ופתוח: אין revocation לסשן קיים בעת reset סיסמה (JWT stateless). בשילוב הסשן ה-sliding (סעיף 10), טוקן שממשיך להיות בשימוש הופך בפועל לבלתי-מוגבל בזמן.
+- **אמון ב-IP (2026-10-14):** `nginx/templates/default.conf.template` מגדיר `X-Forwarded-For $remote_addr` (לא `$proxy_add_x_forwarded_for`, שמצרף לשרשרת שהלקוח שולח וניתן לזיוף), ו-`smsLogin.ts` קורא `x-real-ip` לפני `x-forwarded-for`. דורש reload ל-nginx בפרודקשן.
+- ידוע ופתוח: אין revocation לסשן קיים בעת reset סיסמה (JWT stateless). בשילוב הסשן ה-sliding (סעיף 10), טוקן שממשיך להיות בשימוש הופך בפועל לבלתי-מוגבל בזמן. כך גם לקוח שנחסם (`BlockedPhoneNumber`) — נחסם רק מקביעת תור, לא מהסשן. תיקון ב-`getSession` בלבד יגרום ללולאת redirect מול `proxy.ts` (`/account`→`/login`→`/account`); הפתרון הנכון: `token_version` על `User` + בדיקה ב-`proxy` + migration.
 - ממצאי ביקורת: `security/` (`INFRA`, `SOFTWARE`, `AGENT-HARDENING`), `privacy/`. סוכן `.claude/agents/security-reviewer.md` זמין.
 
 ### גישה ל-`/admin` — שתי הגנות בו-זמנית, לעולם לא רק אחת
