@@ -1,6 +1,7 @@
 import { prisma, sendPushToUser } from "@barberbook/db";
 import {
   APPOINTMENT_REMINDER_LEAD_MINUTES,
+  PAYMENT_REMINDER_DELAY_MINUTES,
   formatIsraelDate,
   formatIsraelTime,
   getSmsProvider,
@@ -59,6 +60,56 @@ export async function sendDueReminders(): Promise<void> {
       });
     } catch (err) {
       console.error(`[worker] reminder for appointment ${appointment.id} failed:`, err);
+    }
+  }
+}
+
+/** Appointments that started longer ago than this are never reminded (e.g. after worker downtime or the first deploy). */
+const PAYMENT_REMINDER_MAX_AGE_MINUTES = 6 * 60;
+
+/**
+ * Half an hour after an appointment starts, reminds the customer to pay the barber. Same
+ * idempotency scheme as sendDueReminders: a payment_reminder Notification row marks it sent.
+ * Appointments still awaiting the barber's approval are skipped (they may never happen).
+ */
+export async function sendDuePaymentReminders(): Promise<void> {
+  const now = new Date();
+  const dueBefore = new Date(now.getTime() - PAYMENT_REMINDER_DELAY_MINUTES * 60_000);
+  const notBefore = new Date(now.getTime() - PAYMENT_REMINDER_MAX_AGE_MINUTES * 60_000);
+
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      status: "scheduled",
+      starts_at: { gte: notBefore, lte: dueBefore },
+      booked_by_user_id: { not: null },
+      booking_request: { isNot: { status: "pending" } },
+      notifications: { none: { type: "payment_reminder" } },
+    },
+    include: { booked_by: true },
+  });
+
+  for (const appointment of appointments) {
+    if (!appointment.booked_by) continue;
+    try {
+      const message = "זוהי תזכורת מהספר לגבי תשלום על התספורת. אם שילמת, ראה הודעה זו כמבוטלת.";
+      await getSmsProvider().send(appointment.booked_by.phone_number, message);
+      await prisma.notification.create({
+        data: {
+          user_id: appointment.booked_by.id,
+          appointment_id: appointment.id,
+          type: "payment_reminder",
+          content: message,
+          status: "sent",
+          sent_at: new Date(),
+        },
+      });
+      await sendPushToUser(appointment.booked_by.id, {
+        title: "תזכורת תשלום",
+        body: message,
+        url: "/account",
+      });
+    } catch (err) {
+      console.error(`[worker] payment reminder for appointment ${appointment.id} failed:`, err);
     }
   }
 }

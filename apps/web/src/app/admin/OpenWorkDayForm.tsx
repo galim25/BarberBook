@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { TimeInput } from "@/components/TimeInput";
 import { useRouter } from "next/navigation";
 import { createWorkDayAction } from "@/lib/actions/workdays";
 
@@ -205,20 +206,18 @@ export function OpenWorkDayForm({
       <div className="flex gap-3">
         <label className="flex flex-1 flex-col gap-1 text-sm text-slate-muted">
           שעת התחלה
-          <input
-            type="time"
+          <TimeInput
             value={startsAt}
-            onChange={(e) => setStartsAt(e.target.value)}
+            onChange={setStartsAt}
             className={inputClass}
             required
           />
         </label>
         <label className="flex flex-1 flex-col gap-1 text-sm text-slate-muted">
           שעת סיום
-          <input
-            type="time"
+          <TimeInput
             value={endsAt}
-            onChange={(e) => setEndsAt(e.target.value)}
+            onChange={setEndsAt}
             className={inputClass}
             required
           />
@@ -229,17 +228,15 @@ export function OpenWorkDayForm({
         <p className="text-sm text-slate-muted">הפסקות</p>
         {breaks.map((b, i) => (
           <div key={i} className="flex items-center gap-2">
-            <input
-              type="time"
+            <TimeInput
               value={b.starts_at}
-              onChange={(e) => updateBreak(i, "starts_at", e.target.value)}
+              onChange={(v) => updateBreak(i, "starts_at", v)}
               className={inputClass}
             />
             <span className="text-slate-muted">—</span>
-            <input
-              type="time"
+            <TimeInput
               value={b.ends_at}
-              onChange={(e) => updateBreak(i, "ends_at", e.target.value)}
+              onChange={(v) => updateBreak(i, "ends_at", v)}
               className={inputClass}
             />
             <button

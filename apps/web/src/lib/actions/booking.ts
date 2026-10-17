@@ -1,22 +1,24 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { prisma } from "@barberbook/db";
 import {
-  isServiceAllowedForBarber,
   localDateToUtcMidnight,
   SUB_BARBER_SERVICE_NAMES,
 } from "@barberbook/shared";
 import { getSession } from "@/lib/auth/session";
-import { findAvailableSlots, isSlotAvailable, type Interval } from "@/lib/availability";
+import { findAvailableSlots, type Interval } from "@/lib/availability";
 import { runSerializable } from "@/lib/serializableTransaction";
 import {
   notifyAdminsOfNewBooking,
   notifyAdminsOfBookingRequest,
   notifyAdminsOfCustomerReschedule,
+  notifyAdminsOfRescheduleRequest,
 } from "@/lib/notifyAdmin";
 import { getRequiresApproval } from "@/lib/actions/settings";
 import { notifyWaitlistOfFreedSlot } from "@/lib/actions/waitlist";
 import { bookAppointmentCore } from "@/lib/actions/bookingCore";
+import { checkAndMaybeMove } from "@/lib/rescheduleCore";
 
 export type ServiceOption = {
   id: string;
@@ -228,69 +230,60 @@ export async function rescheduleAppointmentAction(input: RescheduleInput): Promi
     return { error: "לא ניתן לשנות תורים בחשבון זה. יש ליצור קשר עם הספר" };
   }
 
+  const requiresApproval = await getRequiresApproval();
+
   try {
-    const moved = await runSerializable(async (tx) => {
-      const appointment = await tx.appointment.findUniqueOrThrow({
+    const target = { work_day_id: input.work_day_id, starts_at: new Date(input.starts_at) };
+    const outcome = await runSerializable(async (tx) => {
+      const owned = await tx.appointment.findUniqueOrThrow({
         where: { id: input.appointment_id },
-        include: { service: true, booking_request: true },
+        select: { booked_by_user_id: true, status: true },
       });
-      if (appointment.booked_by_user_id !== session.sub) {
-        throw new Error("FORBIDDEN");
-      }
+      if (owned.booked_by_user_id !== session.sub) throw new Error("FORBIDDEN");
+      if (owned.status !== "scheduled") throw new Error("NOT_ACTIVE");
 
-      const workDay = await tx.workDay.findUniqueOrThrow({
-        where: { id: input.work_day_id },
-        include: {
-          barber: { select: { is_primary: true } },
-          breaks: true,
-          blocked_times: true,
-          appointments: { where: { status: "scheduled" } },
-        },
-      });
-      if (workDay.is_blocked) {
-        throw new Error("DAY_BLOCKED");
+      // An already-approved appointment moves only after the barber approves, when the policy is on.
+      // A still-pending booking request just follows the appointment to its new time (barber decides once).
+      const probe = await checkAndMaybeMove(tx, input.appointment_id, target, false);
+      if (requiresApproval && !probe.pending_booking_request) {
+        const request = await tx.rescheduleRequest.upsert({
+          where: { appointment_id: input.appointment_id },
+          create: {
+            appointment_id: input.appointment_id,
+            requested_by_user_id: session.sub,
+            new_work_day_id: target.work_day_id,
+            new_starts_at: target.starts_at,
+          },
+          update: {
+            status: "pending",
+            new_work_day_id: target.work_day_id,
+            new_starts_at: target.starts_at,
+            requested_at: new Date(),
+            reviewed_at: null,
+            reviewed_by_user_id: null,
+          },
+        });
+        return { kind: "requested" as const, info: probe, request_id: request.id };
       }
-      if (!isServiceAllowedForBarber(workDay.barber.is_primary, appointment.service.name)) {
-        throw new Error("SERVICE_NOT_OFFERED");
-      }
-      const busy: Interval[] = [
-        ...workDay.breaks.map((b) => ({ starts_at: b.starts_at, ends_at: b.ends_at })),
-        ...workDay.blocked_times.map((b) => ({ starts_at: b.starts_at, ends_at: b.ends_at })),
-        ...workDay.appointments
-          .filter((a) => a.id !== appointment.id)
-          .map((a) => ({ starts_at: a.starts_at, ends_at: a.ends_at })),
-      ];
-
-      const starts_at = new Date(input.starts_at);
-      if (starts_at < new Date()) {
-        throw new Error("PAST_SLOT");
-      }
-      const ok = isSlotAvailable(
-        starts_at,
-        appointment.service.duration_minutes,
-        { starts_at: workDay.starts_at, ends_at: workDay.ends_at },
-        busy,
-      );
-      if (!ok) throw new Error("SLOT_TAKEN");
-
-      await tx.appointment.update({
-        where: { id: appointment.id },
-        data: {
-          work_day_id: input.work_day_id,
-          starts_at,
-          ends_at: new Date(starts_at.getTime() + appointment.service.duration_minutes * 60_000),
-        },
-      });
-
-      return {
-        appointment_id: appointment.id,
-        service_name: appointment.service.name,
-        old_starts_at: appointment.starts_at,
-        new_starts_at: starts_at,
-        // A pending booking request just follows the appointment to its new time — still for the barber to decide.
-        awaiting_approval: appointment.booking_request?.status === "pending",
-      };
+      return { kind: "moved" as const, info: await checkAndMaybeMove(tx, input.appointment_id, target, true) };
     });
+
+    if (outcome.kind === "requested") {
+      await notifyAdminsOfRescheduleRequest({
+        appointment_id: outcome.info.appointment_id,
+        service_name: outcome.info.service_name,
+        customer_name: session.full_name,
+        old_starts_at: outcome.info.old_starts_at,
+        new_starts_at: outcome.info.new_starts_at,
+      }).catch((err) => console.error("[notify] failed to notify admins of reschedule request:", err));
+      revalidatePath("/account/appointments");
+      return { success: true, pendingApproval: true };
+    }
+
+    const moved = {
+      ...outcome.info,
+      awaiting_approval: outcome.info.pending_booking_request,
+    };
 
     // The move already succeeded — a failure to notify the barber must not surface as "couldn't update the appointment".
     await notifyAdminsOfCustomerReschedule({ ...moved, customer_name: session.full_name }).catch((err) =>
@@ -318,6 +311,9 @@ export async function rescheduleAppointmentAction(input: RescheduleInput): Promi
     }
     if (err instanceof Error && err.message === "SERVICE_NOT_OFFERED") {
       return { error: "השירות הזה לא זמין אצל הספר הזה" };
+    }
+    if (err instanceof Error && err.message === "NOT_ACTIVE") {
+      return { error: "התור כבר אינו פעיל" };
     }
     return { error: "לא ניתן היה לעדכן את התור, נסה/י שוב" };
   }

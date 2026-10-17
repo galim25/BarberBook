@@ -24,6 +24,10 @@ function pushMetaFor(type: NotificationType): { title: string; url: string } {
       return { title: "שינוי בתור שלך", url: "/account/appointments" };
     case "cancellation_decision":
       return { title: "בקשת הביטול שלך", url: "/account/appointments" };
+    case "payment_reminder":
+      return { title: "תזכורת תשלום", url: "/account" };
+    case "reschedule_decision":
+      return { title: "בקשת שינוי התור שלך", url: "/account/appointments" };
     case "booking_decision":
       return { title: "בקשת התור שלך", url: "/account/appointments" };
     case "appointment_reminder":

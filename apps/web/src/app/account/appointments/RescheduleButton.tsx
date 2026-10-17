@@ -45,6 +45,7 @@ export function RescheduleButton({
   const [slots, setSlots] = useState<string[]>([]);
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
+  const [sent, setSent] = useState(false);
 
   async function start() {
     setOpen(true);
@@ -86,10 +87,12 @@ export function RescheduleButton({
       return;
     }
     setOpen(false);
+    setSent(!!result.pendingApproval);
     router.refresh();
   }
 
   if (!open) {
+    if (sent) return <p className="text-slate-muted text-sm">הבקשה לשינוי התור נשלחה לאישור הספר</p>;
     return (
       <button onClick={start} className="text-barber-teal text-sm font-medium">
         שינוי תור

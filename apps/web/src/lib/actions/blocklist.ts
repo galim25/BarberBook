@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma, Prisma } from "@barberbook/db";
-import { PHONE_NUMBER_REGEX } from "@barberbook/shared";
+import { PHONE_NUMBER_REGEX, normalizeIsraeliPhone } from "@barberbook/shared";
 import { getSession } from "@/lib/auth/session";
 import { getContactNameMap } from "@/lib/contactNames";
 
@@ -49,7 +49,7 @@ export async function blockPhoneNumberAction(input: {
   const session = await requireAdminSession();
   if (!session) return { error: "אין הרשאה" };
 
-  const phone_number = input.phone_number.trim();
+  const phone_number = normalizeIsraeliPhone(input.phone_number) ?? input.phone_number.trim();
   if (!PHONE_NUMBER_REGEX.test(phone_number)) {
     return { error: "מספר טלפון לא תקין" };
   }

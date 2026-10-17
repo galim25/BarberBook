@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { subscribeToPushAction, unsubscribeFromPushAction } from "@/lib/actions/push";
 import { isIos, isIosStandalone } from "@/lib/ios";
 import { subscriptionUsesKey, urlBase64ToUint8Array } from "@/lib/pushKey";
@@ -55,12 +55,15 @@ function markHealedThisSession() {
   } catch {}
 }
 
+const AUTO_ASKED_KEY = "push-auto-asked";
+
 type Status = "checking" | "unsupported" | "ios-not-installed" | "off" | "on" | "denied";
 
 export function PushNotificationToggle({ audience }: { audience: "admin" | "customer" }) {
   const [status, setStatus] = useState<Status>("checking");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
+  const asking = useRef(false);
 
   useEffect(() => {
     async function check() {
@@ -103,8 +106,30 @@ export function PushNotificationToggle({ audience }: { audience: "admin" | "cust
     check().catch(() => setStatus("unsupported"));
   }, []);
 
+  // Customers start with notifications "on by default": on a device that hasn't been asked yet, the first
+  // tap anywhere in the app raises the system permission prompt (browsers — iOS in particular — only
+  // allow that from a user gesture, and Chrome tends to silently suppress prompts raised without one).
+  // Asked once per device; whoever declines can still use the button, and "off" stays off.
+  useEffect(() => {
+    if (audience !== "customer" || status !== "off" || Notification.permission !== "default") return;
+    try {
+      if (localStorage.getItem(AUTO_ASKED_KEY)) return;
+    } catch {
+      return;
+    }
+    function onFirstTap() {
+      try {
+        localStorage.setItem(AUTO_ASKED_KEY, "1");
+      } catch {}
+      void turnOn();
+    }
+    window.addEventListener("click", onFirstTap, { once: true });
+    return () => window.removeEventListener("click", onFirstTap);
+  }, [audience, status]);
+
   async function turnOn() {
-    if (!VAPID_PUBLIC_KEY) return;
+    if (!VAPID_PUBLIC_KEY || asking.current) return;
+    asking.current = true;
     setPending(true);
     setError(undefined);
     try {
@@ -127,6 +152,7 @@ export function PushNotificationToggle({ audience }: { audience: "admin" | "cust
     } catch {
       setError("לא ניתן היה להפעיל התראות במכשיר זה");
     } finally {
+      asking.current = false;
       setPending(false);
     }
   }

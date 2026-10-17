@@ -13,6 +13,8 @@ export type {
   AppointmentStatus,
   CancellationRequest,
   CancellationStatus,
+  RescheduleRequest,
+  RescheduleStatus,
   Notification,
   NotificationType,
   NotificationStatus,

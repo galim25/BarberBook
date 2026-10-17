@@ -37,18 +37,34 @@ export type CustomerContactRow = {
   source: string | null;
 };
 
-/** Every customer + every number the barber has a name for — the /admin/contacts list. */
+/** Customers drop off the /admin/contacts list this long after registering — by then the barber has already named them. */
+const CONTACTS_LIST_RECENT_HOURS = 48;
+
+/**
+ * The /admin/contacts list: customers who registered in the last 48 hours + numbers the barber saved a
+ * name for that never registered. Display only — older customers stay full accounts (appointments, login,
+ * names in every other admin screen).
+ */
 export async function getCustomerContacts(): Promise<CustomerContactRow[]> {
   if (!(await requireAdminSession())) return [];
+  const since = new Date(Date.now() - CONTACTS_LIST_RECENT_HOURS * 3_600_000);
   const [users, names] = await Promise.all([
-    prisma.user.findMany({ where: { role: "customer" }, select: { phone_number: true, full_name: true } }),
+    prisma.user.findMany({
+      where: { role: "customer", created_at: { gte: since } },
+      select: { phone_number: true, full_name: true },
+    }),
     prisma.contactName.findMany(),
   ]);
   const rows = new Map<string, CustomerContactRow>();
   for (const u of users) {
     rows.set(u.phone_number, { phone_number: u.phone_number, registered_name: u.full_name, contact_name: null, source: null });
   }
+  const registered = new Set(
+    (await prisma.user.findMany({ where: { role: "customer" }, select: { phone_number: true } })).map((u) => u.phone_number),
+  );
   for (const n of names) {
+    // A name saved for an already-registered (older) customer is hidden along with that customer.
+    if (registered.has(n.phone_number) && !rows.has(n.phone_number)) continue;
     const row = rows.get(n.phone_number) ?? { phone_number: n.phone_number, registered_name: null, contact_name: null, source: null };
     rows.set(n.phone_number, { ...row, contact_name: n.display_name, source: n.source });
   }

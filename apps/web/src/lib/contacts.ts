@@ -1,20 +1,8 @@
-import { PHONE_NUMBER_REGEX } from "@barberbook/shared";
+import { normalizeIsraeliPhone } from "@barberbook/shared";
 
 export type ParsedContact = { name: string; phone_number: string };
 
-/**
- * Turns a phone number as it appears in a phone's contacts ("+972 50-123-4567",
- * "050 1234567", "00972501234567", "(050) 123 4567") into the local format every
- * phone_number in the DB uses (0501234567, see PHONE_NUMBER_REGEX). Returns null
- * for anything that isn't an Israeli number — those can't match a customer.
- */
-export function normalizeIsraeliPhone(raw: string): string | null {
-  let digits = raw.replace(/[^\d+]/g, "");
-  if (digits.startsWith("+")) digits = digits.slice(1);
-  else if (digits.startsWith("00")) digits = digits.slice(2);
-  if (digits.startsWith("972")) digits = `0${digits.slice(3).replace(/^0/, "")}`;
-  return PHONE_NUMBER_REGEX.test(digits) ? digits : null;
-}
+export { normalizeIsraeliPhone };
 
 /** wa.me wants the international number without "+" or the local leading 0. */
 export function whatsappUrl(phone_number: string): string {

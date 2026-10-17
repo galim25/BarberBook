@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { removeWaitlistEntryAction } from "@/lib/actions/waitlist";
+import { removeDateWaitlistEntryAdminAction, removeWaitlistEntryAction } from "@/lib/actions/waitlist";
 
-export function RemoveWaitlistEntryButton({ id }: { id: string }) {
+export function RemoveWaitlistEntryButton({ id, kind = "general" }: { id: string; kind?: "general" | "date" }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
   async function remove() {
     setPending(true);
-    await removeWaitlistEntryAction(id);
+    await (kind === "date" ? removeDateWaitlistEntryAdminAction(id) : removeWaitlistEntryAction(id));
     setPending(false);
     router.refresh();
   }

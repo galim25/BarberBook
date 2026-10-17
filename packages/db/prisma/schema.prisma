@@ -26,6 +26,12 @@ enum AppointmentStatus {
   cancelled
 }
 
+enum RescheduleStatus {
+  pending
+  approved
+  rejected
+}
+
 enum CancellationStatus {
   pending
   approved
@@ -48,6 +54,10 @@ enum NotificationType {
   booking_request_pending
   cancellation_request_pending
   customer_registered
+  reschedule_request_pending
+  reschedule_decision
+  payment_reminder
+  waitlist_joined
 }
 
 enum ContactNameSource {
@@ -75,11 +85,14 @@ model User {
   appointments_booked          Appointment[]         @relation("AppointmentBookedBy")
   cancellation_requests_made   CancellationRequest[]  @relation("CancellationRequestedBy")
   cancellation_requests_review CancellationRequest[]  @relation("CancellationReviewedBy")
+  reschedule_requests_made     RescheduleRequest[]    @relation("RescheduleRequestedBy")
+  reschedule_requests_review   RescheduleRequest[]    @relation("RescheduleReviewedBy")
   booking_requests_reviewed    BookingRequest[]
   notifications                Notification[]
   announcements_published      Announcement[]
   blocked_phone_numbers        BlockedPhoneNumber[]
   waitlist_entry               WaitlistEntry?
+  waitlist_date_entries        WaitlistDateEntry[]
   push_subscriptions           PushSubscription[]
 
   @@map("users")
@@ -169,6 +182,7 @@ model WorkDay {
   breaks        WorkBreak[]
   blocked_times BlockedTime[]
   appointments  Appointment[]
+  waitlist_date_entries WaitlistDateEntry[]
 
   @@unique([barber_id, work_date])
   @@map("work_days")
@@ -223,6 +237,7 @@ model Appointment {
   booked_by            User?                @relation("AppointmentBookedBy", fields: [booked_by_user_id], references: [id], onDelete: SetNull)
   cancellation_request CancellationRequest?
   booking_request      BookingRequest?
+  reschedule_request   RescheduleRequest?
   notifications        Notification[]
 
   @@index([work_day_id])
@@ -250,6 +265,29 @@ model CancellationRequest {
 
   @@index([requested_by_user_id])
   @@map("cancellation_requests")
+}
+
+/// A customer's request to move an already-approved appointment (only when AppSettings.requires_approval is on).
+/// The appointment keeps its current time until the barber approves; the requested slot is NOT held.
+model RescheduleRequest {
+  id                    String            @id @default(cuid())
+  appointment_id        String            @unique
+  requested_by_user_id  String
+  reviewed_by_user_id   String?
+  new_work_day_id       String
+  new_starts_at         DateTime
+  status                RescheduleStatus  @default(pending)
+  requested_at          DateTime          @default(now())
+  reviewed_at           DateTime?
+  created_at            DateTime          @default(now())
+  updated_at            DateTime          @updatedAt
+
+  appointment  Appointment @relation(fields: [appointment_id], references: [id], onDelete: Cascade)
+  requested_by User        @relation("RescheduleRequestedBy", fields: [requested_by_user_id], references: [id], onDelete: Restrict)
+  reviewed_by  User?       @relation("RescheduleReviewedBy", fields: [reviewed_by_user_id], references: [id], onDelete: SetNull)
+
+  @@index([requested_by_user_id])
+  @@map("reschedule_requests")
 }
 
 model BookingRequest {
@@ -338,6 +376,9 @@ model AppSettings {
   id                 String   @id @default("singleton")
   requires_approval  Boolean  @default(false)
   ivr_enabled        Boolean  @default(true)
+  /// What the per-date waitlist offers customers: [{ key, enabled, from, to }] for morning/afternoon/evening
+  /// (apps/web/src/lib/waitlistPeriods.ts). Null = the defaults.
+  waitlist_periods   Json?
   updated_at         DateTime @updatedAt
 
   @@map("app_settings")
@@ -356,6 +397,24 @@ model WaitlistEntry {
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("waitlist_entries")
+}
+
+/// "Tell me when a slot frees up on THIS work day, in this time of day" — the per-date waitlist
+/// picked from the booking flow. Separate from WaitlistEntry (the general list, one per user).
+model WaitlistDateEntry {
+  id          String   @id @default(cuid())
+  user_id     String
+  work_day_id String
+  /// "morning" | "afternoon" | "evening" — see apps/web/src/lib/waitlistPeriods.ts
+  period      String
+  created_at  DateTime @default(now())
+
+  user     User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  work_day WorkDay @relation(fields: [work_day_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, work_day_id, period])
+  @@index([work_day_id])
+  @@map("waitlist_date_entries")
 }
 
 /// The barber's own name for a phone number, as saved in their phone's contacts (imported from a

@@ -7,6 +7,7 @@ import { getBarbersAdmin } from "@/lib/actions/barbers";
 import { getAppointmentsForWorkDay } from "@/lib/actions/adminAppointments";
 import { getPendingCancellationCount } from "@/lib/actions/cancellationRequests";
 import { getUnreadAdminNotificationCount } from "@/lib/actions/adminNotifications";
+import { getPendingRescheduleCount } from "@/lib/actions/rescheduleRequests";
 import { getPendingBookingRequestCount } from "@/lib/actions/bookingRequests";
 import { buildDayTimeline } from "@/lib/dayTimeline";
 import { OpenWorkDayForm } from "./OpenWorkDayForm";
@@ -50,6 +51,7 @@ export default async function AdminPage({
   const pendingCancellations = await getPendingCancellationCount();
   const unreadNotifications = await getUnreadAdminNotificationCount();
   const pendingBookingRequests = await getPendingBookingRequestCount();
+  const pendingReschedules = await getPendingRescheduleCount();
 
   const nearestWorkDay = workDays[0];
   const nearestWorkDayDetail = nearestWorkDay ? await getWorkDayDetail(nearestWorkDay.id) : null;
@@ -72,6 +74,7 @@ export default async function AdminPage({
             { href: "/admin/contacts", label: "אנשי קשר" },
             { href: "/admin/blocked-customers", label: "לקוחות חסומים" },
             { href: "/admin/waitlist", label: "רשימת המתנה" },
+            { href: "/admin/waitlist-settings", label: "ניהול רשימת המתנה" },
             { href: "/admin/announcements", label: "הודעות כלליות" },
             { href: "/admin/print-all", label: "היסטוריה וגיבוי" },
             { href: "/admin/settings", label: "הגדרות" },
@@ -103,6 +106,7 @@ export default async function AdminPage({
       <div className="mx-auto flex w-64 flex-col gap-2">
         {[
           { href: "/admin/booking-requests", label: "בקשות תורים", count: pendingBookingRequests },
+          { href: "/admin/reschedule-requests", label: "בקשות שינוי תור", count: pendingReschedules },
           { href: "/admin/cancellation-requests", label: "בקשות ביטול", count: pendingCancellations },
           { href: "/admin/notifications", label: "התראות", count: unreadNotifications },
         ].map((b) => (

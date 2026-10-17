@@ -170,6 +170,7 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 - **מדיניות "דורש אישור"** (`AppSettings.requires_approval`, ברירת מחדל כבויה) קובעת גלובלית את קביעת תור חדש **וגם** בקשת ביטול:
   - דלוקה: קביעה נשמרת כ-`BookingRequest` ממתין (התור כבר תופס את השעה); ביטול נשמר כ-`CancellationRequest` ממתינה — רק החלטת הספר קובעת.
   - כבויה: שניהם קורים **מיידית**. אל תניחו שביטול/קביעה תמיד דורשים אישור — בדקו `getRequiresApproval()`.
+- **שינוי תור כשהמדיניות דלוקה** (2026-10-17): לקוח שמשנה תור מאושר יוצר `RescheduleRequest` (אחת לתור, `appointment_id @unique`); התור נשאר בשעה הישנה עד שהספר מאשר ב-`/admin/reschedule-requests`; השעה החדשה **לא** נתפסת בזמן ההמתנה ונבדקת מחדש באישור (`SLOT_TAKEN` → הספר דוחה). תור שעדיין ממתין לאישור קביעה ממשיך לעקוב אחרי ההעברה כמקודם. מדיניות כבויה → העברה מיידית. לוגיקה משותפת ב-`lib/rescheduleCore.ts`. Migration: `20261017150000_add_reschedule_requests` (**טרם הורצה**).
 - **חסימת יום** נאכפת בשלוש שכבות: `getOpenDates()` (לא מציגה), `bookAppointmentAction`/`rescheduleAppointmentAction` (זורקות `DAY_BLOCKED`). לא חל על קביעה ידנית של הספר.
 - **חסימת מספרי טלפון** (`BlockedPhoneNumber`) נאכפת בהרשמה, בכניסה (שליחת קוד ואימות), בקביעה ובשינוי תור — גם למספרים שטרם נרשמו.
 - **הודעת ביטול על תור — תמיד לבדוק `starts_at >= new Date()`** ולא רק `status === "scheduled"` (תקלה אמיתית שתוקנה ב-`deleteWorkDayAction`/`deleteAllWorkDaysAction` (הוסרה מאז)/`cancelAppointmentAction`: תור היסטורי עלול לגרום להודעת "בוטל" מטעה).
@@ -279,6 +280,12 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 1. **`notifyWaitlistOfFreedSlot(starts_at, service, owner_user_id)`** — תור עתידי שהתפנה: ביטול ישיר ע"י הספר, אישור/ביטול מיידי של בקשת ביטול, דחיית בקשת תור, **וגם העברת תור (ע"י לקוח או ספר) — השעה הישנה שהתפנתה** (נוסף 2026-10-05, commit `542d4e0`; מותנה בכך שהשעה הישנה עתידית ושונתה בפועל; כשל התראה נרשם בלוג ולא מכשיל את ההעברה). בעל התור מוחרג. **נשלח רק לחברי הרשימה שהשאירו דלוק `WaitlistEntry.notify_freed_slots`** (ברירת מחדל `true`; מתג "התראה כשמתפנה תור" ב-`/account`, `FreedSlotNotifyToggle`) — **שונה 2026-10-06**: עד אז נשלח גם לכל לקוח עם Push, וזה בוטל.
 2. **`notifyWaitlistOfExtendedHours`** — `updateWorkDayHoursAction` **מרחיבה** יום פתוח.
 3. **`notifyWaitlistOfNewWorkDay`** — `createWorkDayAction` פותחת יום חדש לגמרי (תוקן 2026-07-26: בלעדיו לקוח שהצטרף כשאין אף יום פתוח לא קיבל התראה).
+
+**רשימת המתנה פר-תאריך (2026-10-17):** בשלבי "טווח"/"שעה" בקביעת תור יש כפתור "לא מצאת שעה שמתאימה לך? כנס/י לרשימת המתנה" ← בוקר (9-13) / צהריים (13-17) / ערב (17-20). נשמר בטבלה `WaitlistDateEntry` (user + `work_day_id` + period, cascade עם היום) — **רק** לאותו יום עבודה (של אותו ספר). `notifyWaitlistOfFreedSlot` מוצאת את ה-`WorkDay` שמכסה את השעה ושולחת למי שנרשם ליום+טווח (`lib/waitlistPeriods.ts`); מי שגם ברשימה הכללית לא מקבל כפול. מוצג וניתן להסרה ב-`/account` (`DateWaitlistList`). Migration `20261017120000_add_waitlist_date_entries` — **טרם הורצה** בשום שרת. הוסר גם טקסט "N פנויים" מכפתורי הטווח.
+
+**הקלדת שעה ידנית (2026-10-17):** `components/TimeInput.tsx` (HH:MM, נקודתיים אוטומטי) מחליפה את `type="time"` בפתיחת יום ובעדכון שעות.
+
+**ניהול רשימת המתנה (2026-10-18):** `/admin/waitlist-settings` (תפריט: "ניהול רשימת המתנה") — הספר בוחר אילו מבין בוקר/צהריים/ערב יוצגו ללקוח ומגדיר שעות HH:MM לכל אחד (ברירת מחדל 09-13 / 13-17 / 17-20). נשמר ב-`AppSettings.waitlist_periods` (JSON; migration `20261018120000_add_waitlist_periods_setting`), לוגיקה ב-`lib/waitlistPeriods.ts`, פעולות ב-`lib/actions/waitlistSettings.ts`. ההגדרה קובעת גם את ההתראות: תור שהתפנה מחוץ לטווחים המוצגים לא מודיע לרשימות לפי תאריך.
 
 המתג `notify_freed_slots` חל **רק** על תור שהתפנה; יום חדש/הרחבת שעות נשלחים לכל הרשימה (זו הסיבה להיות בה). הצטרפות/עזיבת רשימה לא מודיעה לספר.
 

@@ -12,7 +12,9 @@ import {
   type OpenDate,
 } from "@/lib/actions/booking";
 import { getActiveBarbers, type BarberOption } from "@/lib/actions/barbers";
-import { joinWaitlistAction } from "@/lib/actions/waitlist";
+import { joinWaitlistAction, joinDateWaitlistAction } from "@/lib/actions/waitlist";
+import { getWaitlistPeriods } from "@/lib/actions/waitlistSettings";
+import { waitlistPeriodLabel, waitlistPeriodRange, type WaitlistPeriodConfig } from "@/lib/waitlistPeriods";
 import { getRequiresApproval } from "@/lib/actions/settings";
 import { getDayPeriods, type DayPeriod } from "@/lib/availability";
 import { BrandHero } from "@/components/BrandHero";
@@ -128,6 +130,67 @@ function DateCalendar({
   );
 }
 
+/** "Didn't find a suitable time" → pick a time of day to be alerted about when a slot frees up. */
+function WaitlistPeriodPicker({
+  periods,
+  dateLabel,
+  joinedPeriods,
+  pendingPeriod,
+  onJoin,
+}: {
+  periods: WaitlistPeriodConfig[];
+  dateLabel: string;
+  joinedPeriods: string[];
+  pendingPeriod?: string;
+  onJoin: (period: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (periods.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      {!open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="border-barber-teal text-barber-teal rounded-full border py-2 text-sm font-medium"
+        >
+          לא מצאת שעה שמתאימה לך? כנס/י לרשימת המתנה
+        </button>
+      ) : (
+        <>
+          <p className="text-ink text-sm font-bold">באיזה שעות נוח לך לקבל התראה כשמתפנה תור ב{dateLabel}?</p>
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${periods.length}, minmax(0, 1fr))` }}>
+            {periods.map((p) => {
+              const joined = joinedPeriods.includes(p.key);
+              return (
+                <button
+                  type="button"
+                  key={p.key}
+                  disabled={joined || pendingPeriod !== undefined}
+                  onClick={() => onJoin(p.key)}
+                  className="from-barber-teal to-cream text-ink flex aspect-square flex-col items-center justify-center gap-1 rounded-xl bg-gradient-to-bl p-2 text-center disabled:opacity-60"
+                >
+                  <span className="text-base font-bold">{p.label}</span>
+                  <span dir="ltr" className="text-ink/80 text-xs">
+                    {waitlistPeriodRange(p)}
+                  </span>
+                  {joined && <span className="text-xs font-bold">נרשמת ✓</span>}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+      {joinedPeriods.length > 0 && (
+        <p className="text-barber-teal text-sm font-medium">
+          נרשמת לרשימת ההמתנה ל{dateLabel} ({joinedPeriods.map((k) => waitlistPeriodLabel(periods, k)).join(", ")}) — נעדכן אותך
+          כשיתפנה תור בשעות האלה.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function BookAppointmentPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("barber");
@@ -144,6 +207,9 @@ export default function BookAppointmentPage() {
   const [pending, setPending] = useState(false);
   const [waitlistJoined, setWaitlistJoined] = useState(false);
   const [waitlistPending, setWaitlistPending] = useState(false);
+  const [waitlistPeriods, setWaitlistPeriods] = useState<string[]>([]);
+  const [waitlistConfig, setWaitlistConfig] = useState<WaitlistPeriodConfig[]>([]);
+  const [waitlistPendingPeriod, setWaitlistPendingPeriod] = useState<string>();
   const [pendingApproval, setPendingApproval] = useState(false);
   const [requiresApproval, setRequiresApproval] = useState(false);
 
@@ -226,12 +292,16 @@ export default function BookAppointmentPage() {
     getRequiresApproval()
       .then(setRequiresApproval)
       .catch(() => {});
+    getWaitlistPeriods()
+      .then((all) => setWaitlistConfig(all.filter((p) => p.enabled)))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function chooseDate(d: OpenDate) {
     if (!barber) return;
     setDate(d);
+    setWaitlistPeriods([]);
     setError(undefined);
     const available = await getServices(barber.id);
     setServices(available);
@@ -297,6 +367,19 @@ export default function BookAppointmentPage() {
     await joinWaitlistAction();
     setWaitlistPending(false);
     setWaitlistJoined(true);
+  }
+
+  async function joinWaitlistForPeriod(period: string) {
+    if (!date) return;
+    setWaitlistPendingPeriod(period);
+    const result = await joinDateWaitlistAction(date.work_day_id, period);
+    setWaitlistPendingPeriod(undefined);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setError(undefined);
+    setWaitlistPeriods((prev) => (prev.includes(period) ? prev : [...prev, period]));
   }
 
   /** Back to the very first step — after a booking ("קביעת תור נוסף") and from the summary's "ביטול". */
@@ -442,32 +525,20 @@ export default function BookAppointmentPage() {
                 >
                   {p.label}{" "}
                   <span className="text-slate-muted text-sm">
-                    ({formatTime(p.starts_at.toISOString())}–{formatTime(p.ends_at.toISOString())} ·{" "}
-                    {count > 0 ? `${count} פנויים` : "מלא"})
+                    ({formatTime(p.starts_at.toISOString())}–{formatTime(p.ends_at.toISOString())})
                   </span>
                 </button>
               );
             })}
           </div>
-          {slots.length === 0 && (
-            <div className="flex flex-col gap-2">
-              <p className="text-slate-muted">אין שעות פנויות ביום זה.</p>
-              {waitlistJoined ? (
-                <p className="text-barber-teal text-sm font-medium">
-                  נרשמת לרשימת ההמתנה — נעדכן אותך כשיתפנה תור.
-                </p>
-              ) : (
-                <button
-                  type="button"
-                  onClick={joinWaitlist}
-                  disabled={waitlistPending}
-                  className="border-barber-teal text-barber-teal rounded-full border py-2 text-sm font-medium disabled:opacity-50"
-                >
-                  {waitlistPending ? "נרשם..." : "הצטרפ/י לרשימת ההמתנה"}
-                </button>
-              )}
-            </div>
-          )}
+          {slots.length === 0 && <p className="text-slate-muted">אין שעות פנויות ביום זה.</p>}
+          <WaitlistPeriodPicker
+            periods={waitlistConfig}
+            dateLabel={date ? formatDate(date.work_date) : ""}
+            joinedPeriods={waitlistPeriods}
+            pendingPeriod={waitlistPendingPeriod}
+            onJoin={joinWaitlistForPeriod}
+          />
           <button type="button" onClick={() => setStep("service")} className="text-barber-teal self-start text-sm font-medium">
             חזרה
           </button>
@@ -477,25 +548,7 @@ export default function BookAppointmentPage() {
       {step === "slot" && (
         <div className="flex flex-col gap-3">
           <p className="text-ink font-bold">בחרו שעה:</p>
-          {periodSlots.length === 0 && (
-            <div className="flex flex-col gap-2">
-              <p className="text-slate-muted">אין שעות פנויות בטווח הזה.</p>
-              {waitlistJoined ? (
-                <p className="text-barber-teal text-sm font-medium">
-                  נרשמת לרשימת ההמתנה — נעדכן אותך כשיתפנה תור.
-                </p>
-              ) : (
-                <button
-                  type="button"
-                  onClick={joinWaitlist}
-                  disabled={waitlistPending}
-                  className="border-barber-teal text-barber-teal rounded-full border py-2 text-sm font-medium disabled:opacity-50"
-                >
-                  {waitlistPending ? "נרשם..." : "הצטרפ/י לרשימת ההמתנה"}
-                </button>
-              )}
-            </div>
-          )}
+          {periodSlots.length === 0 && <p className="text-slate-muted">אין שעות פנויות בטווח הזה.</p>}
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex flex-wrap gap-2">
             {periodSlots.map((s) => (
@@ -510,6 +563,13 @@ export default function BookAppointmentPage() {
               </button>
             ))}
           </div>
+          <WaitlistPeriodPicker
+            periods={waitlistConfig}
+            dateLabel={date ? formatDate(date.work_date) : ""}
+            joinedPeriods={waitlistPeriods}
+            pendingPeriod={waitlistPendingPeriod}
+            onJoin={joinWaitlistForPeriod}
+          />
           <button
             type="button"
             onClick={() => setStep(periods.length === 1 ? "service" : "period")}

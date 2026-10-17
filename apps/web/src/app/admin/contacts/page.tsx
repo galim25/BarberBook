@@ -23,7 +23,7 @@ export default async function ContactsPage() {
       <ContactsImport />
 
       <div className="flex flex-col gap-2">
-        <h2 className="text-ink font-bold">לקוחות ({contacts.length})</h2>
+        <h2 className="text-ink font-bold">לקוחות</h2>
         {withoutName > 0 && (
           <p className="text-slate-muted text-sm">
             ל-{withoutName} מהם אין עדיין שם מאנשי הקשר. אפשר לייבא שוב או ללחוץ ✎ ליד השם.

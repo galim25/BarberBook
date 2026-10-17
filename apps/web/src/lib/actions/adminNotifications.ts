@@ -11,7 +11,9 @@ const ADMIN_NOTIFICATION_TYPES = [
   "booking_request_pending",
   "cancellation_request_pending",
   "appointment_changed",
+  "reschedule_request_pending",
   "customer_registered",
+  "waitlist_joined",
 ] as const;
 
 async function requireAdminSession() {

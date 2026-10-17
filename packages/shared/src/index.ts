@@ -33,6 +33,24 @@ export function isServiceAllowedForBarber(barberIsPrimary: boolean, serviceName:
 
 export const PHONE_NUMBER_REGEX = /^0\d{8,9}$/;
 
+/** Local-format mobile number (05X…) — the only kind that can receive the login SMS; landlines (02/03/04/08/09) and VoIP (07X) can't. */
+export function isIsraeliMobile(localPhone: string): boolean {
+  return /^05\d{8}$/.test(localPhone);
+}
+
+/**
+ * Turns the ways people type an Israeli number — 050-123-4567, 050 123 4567, +972501234567,
+ * 972501234567, 00972501234567, +972 (0)50 123 4567 — into the local form the DB and the SMS provider
+ * use (0501234567). Returns null when the result is not a valid Israeli number.
+ */
+export function normalizeIsraeliPhone(raw: string): string | null {
+  let digits = raw.replace(/[^\d+]/g, "");
+  if (digits.startsWith("+")) digits = digits.slice(1);
+  else if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.startsWith("972")) digits = `0${digits.slice(3).replace(/^0/, "")}`;
+  return PHONE_NUMBER_REGEX.test(digits) ? digits : null;
+}
+
 /**
  * The salon operates on Israel time regardless of where the server process
  * or the customer's device happen to be set — a Server Component renders
@@ -48,6 +66,8 @@ export const PASSWORD_RESET_CODE_TTL_MINUTES = 10;
 export const LOGIN_CODE_TTL_MINUTES = 10;
 export const LOGIN_CODE_MAX_ATTEMPTS = 5;
 export const APPOINTMENT_REMINDER_LEAD_MINUTES = 120;
+/** Minutes after an appointment starts before the customer gets the "did you pay?" reminder. */
+export const PAYMENT_REMINDER_DELAY_MINUTES = 30;
 
 export * from "./sms";
 export * from "./sms019";

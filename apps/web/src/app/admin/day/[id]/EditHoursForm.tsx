@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { TimeInput } from "@/components/TimeInput";
 import { useRouter } from "next/navigation";
 import { updateWorkDayHoursAction } from "@/lib/actions/workdays";
 
@@ -42,20 +43,18 @@ export function EditHoursForm({
       <div className="flex gap-3">
         <label className="flex flex-1 flex-col gap-1 text-sm text-slate-muted">
           שעת התחלה
-          <input
-            type="time"
+          <TimeInput
             value={startsAt}
-            onChange={(e) => setStartsAt(e.target.value)}
+            onChange={setStartsAt}
             className="border-barber-teal bg-white text-ink rounded-xl border p-2"
             required
           />
         </label>
         <label className="flex flex-1 flex-col gap-1 text-sm text-slate-muted">
           שעת סיום
-          <input
-            type="time"
+          <TimeInput
             value={endsAt}
-            onChange={(e) => setEndsAt(e.target.value)}
+            onChange={setEndsAt}
             className="border-barber-teal bg-white text-ink rounded-xl border p-2"
             required
           />

@@ -12,7 +12,7 @@ import { checkRateLimit } from "@/lib/rateLimit";
 import { isSmsLoginEnabled } from "@/lib/loginMode";
 import { checkLoginCode, issueLoginCode } from "@/lib/smsLoginCore";
 import { registerUserCore } from "@/lib/actions/registerCore";
-import { phoneSchema } from "@/lib/validation";
+import { mobilePhoneSchema, phoneSchema, MOBILE_ONLY_ERROR } from "@/lib/validation";
 
 /**
  * Customer sign-in with a one-time SMS code (docs/SMS-LOGIN.md) — one action for
@@ -58,6 +58,11 @@ async function isBlocked(phone_number: string): Promise<boolean> {
   return (await prisma.blockedPhoneNumber.findUnique({ where: { phone_number } })) !== null;
 }
 
+/** A valid Israeli number that can't get SMS (landline/VoIP) gets its own message; anything else is simply invalid. */
+function phoneError(raw: FormDataEntryValue | null): string {
+  return phoneSchema.safeParse(raw).success ? MOBILE_ONLY_ERROR : "מספר טלפון לא תקין";
+}
+
 export async function smsLoginAction(_prev: SmsLoginState, formData: FormData): Promise<SmsLoginState> {
   if (!isSmsLoginEnabled()) return { step: "phone", error: "כניסה עם קוד אינה זמינה כרגע" };
 
@@ -74,8 +79,8 @@ export async function smsLoginAction(_prev: SmsLoginState, formData: FormData): 
 }
 
 async function sendCode(formData: FormData): Promise<SmsLoginState> {
-  const parsed = phoneSchema.safeParse(formData.get("phone_number"));
-  if (!parsed.success) return { step: "phone", error: "מספר טלפון לא תקין" };
+  const parsed = mobilePhoneSchema.safeParse(formData.get("phone_number"));
+  if (!parsed.success) return { step: "phone", error: phoneError(formData.get("phone_number")) };
   const phone_number = parsed.data;
 
   const ip = await clientIp();
@@ -105,9 +110,9 @@ async function sendCode(formData: FormData): Promise<SmsLoginState> {
 }
 
 async function verifyCode(formData: FormData): Promise<SmsLoginState> {
-  const parsedPhone = phoneSchema.safeParse(formData.get("phone_number"));
+  const parsedPhone = mobilePhoneSchema.safeParse(formData.get("phone_number"));
   const code = String(formData.get("code") ?? "").trim();
-  if (!parsedPhone.success) return { step: "phone", error: "מספר טלפון לא תקין" };
+  if (!parsedPhone.success) return { step: "phone", error: phoneError(formData.get("phone_number")) };
   const phone_number = parsedPhone.data;
   if (!/^\d{6}$/.test(code)) return { step: "code", phone_number, error: "יש להזין את הקוד בן 6 הספרות" };
 

@@ -123,11 +123,38 @@ export async function notifyAdminsOfCustomerReschedule(info: CustomerRescheduleI
   });
 }
 
+/** In-app + push — a customer asked to move an approved appointment (approval policy on); it stays at its current time until the barber decides in /admin/reschedule-requests. */
+export async function notifyAdminsOfRescheduleRequest(info: CustomerRescheduleInfo): Promise<void> {
+  await notifyAdmins({
+    type: "reschedule_request_pending",
+    message: `בקשת שינוי תור ממתינה לאישור: ${info.service_name} של ${info.customer_name} מ-${formatIsraelDate(info.old_starts_at)} ${formatIsraelTime(info.old_starts_at)} ל-${formatIsraelDate(info.new_starts_at)} ${formatIsraelTime(info.new_starts_at)}.`,
+    push: { title: "בקשת שינוי תור", url: "/admin/reschedule-requests" },
+    appointment_id: info.appointment_id,
+  });
+}
+
 /** In-app + push — a new customer account was created (through the app's sign-up form or the phone line's new-caller registration). */
 export async function notifyAdminsOfNewCustomer(info: { customer_name: string }): Promise<void> {
   await notifyAdmins({
     type: "customer_registered",
     message: `לקוח חדש נרשם: ${info.customer_name}.`,
     push: { title: "לקוח חדש", url: "/admin" },
+  });
+}
+
+/** In-app + push — a customer joined the waitlist (the general list, or a specific date + time of day). */
+export async function notifyAdminsOfWaitlistJoin(info: {
+  customer_name: string;
+  /** Set for a per-date entry. */
+  work_date?: Date;
+  period_label?: string;
+}): Promise<void> {
+  const where = info.work_date
+    ? `לתאריך ${formatIsraelDate(info.work_date)}${info.period_label ? ` (${info.period_label})` : ""}`
+    : "הכללית";
+  await notifyAdmins({
+    type: "waitlist_joined",
+    message: `${info.customer_name} נרשם/ה לרשימת ההמתנה ${where}.`,
+    push: { title: "נרשמו לרשימת המתנה", url: "/admin/waitlist" },
   });
 }
