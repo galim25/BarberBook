@@ -2,7 +2,7 @@
 
 אפליקציה לניהול תורים עבור ספר עצמאי. לקוחות קובעים, משנים ומבקשים לבטל תורים בעצמם (באפליקציה או בטלפון) לפי הזמינות שהספר מגדיר; הספר מנהל את היומן במלואו מתוך מסך ניהול.
 
-> **עודכן לאחרונה: 2026-10-14** (סקירת קוד: עמידות worker, אמון ב-IP, חידוש סשן, אינדקס — ראו סעיפים 4, 9, 10, 12) · קודם 2026-10-07 — המסמך סודר מחדש לפי קטגוריות ועודכן מול הקוד וההיסטוריה (62 commits). הגרסה הקודמת (לא מסודרת) נשמרה ב-`docs/archive/CLAUDE.md.bak-2026-10-06`.
+> **עודכן לאחרונה: 2026-10-18** (רשימת המתנה פר-תאריך עם טווחי שעות שהספר מגדיר, בקשות שינוי מועד, תזכורת תשלום, ניקוי לילי, הקלדת שעה ידנית, כניסה עם +972 וניידים בלבד, Push בהקשה ראשונה, מיגרציות חדשות — ראו סעיפים 2, 5, 7, 8, 9, 10) · קודם **2026-10-14** (סקירת קוד: עמידות worker, אמון ב-IP, חידוש סשן, אינדקס — ראו סעיפים 4, 9, 10, 12) · קודם 2026-10-07 — המסמך סודר מחדש לפי קטגוריות ועודכן מול הקוד וההיסטוריה (62 commits). הגרסה הקודמת (לא מסודרת) נשמרה ב-`docs/archive/CLAUDE.md.bak-2026-10-06`.
 
 ## תוכן עניינים
 
@@ -50,14 +50,20 @@
 - **אנשי קשר של הספר** (2026-10-05) — שמות לקוחות כפי ששמורים בטלפון של הספר, מוצגים בכל מסכי `/admin` (סעיף 8).
 - **מתג "התראה כשמתפנה תור"** ללקוח ברשימת ההמתנה (2026-10-06) — ראו סעיף 9.
 
+- **רשימת המתנה פר-תאריך + ניהול טווחי שעות** (2026-10-17/18) — סעיפים 7, 8, 9. **שינוי מועד כשהמדיניות דלוקה** (בקשה לספר) — סעיף 6. **תזכורת תשלום** ו**ניקוי לילי** ב-worker — סעיפים 8, 9. **הקלדת שעה ידנית** לספר, **כניסה עם `+972`/ניידים בלבד**, **Push בהקשה ראשונה** — סעיפים 8, 10, 9. כל אלה **רצים בשרת הפיתוח** (נבנו ונפרסו 2026-10-18).
+
 ### פתוח / לא נבדק
+- **מיגרציות שטרם הורצו בפרודקשן (Docker):** לפי הסדר — `20261017120000_add_waitlist_date_entries`, `20261017150000_add_reschedule_requests`, `20261017160000_add_waitlist_joined_notification`, `20261017170000_add_payment_reminder_notification_type`, `20261018120000_add_waitlist_periods_setting` (אחרי `20261014120000_add_appointment_status_starts_at_index`). **הקוד החדש קורס בלי** `…150000_add_reschedule_requests` (בקשות שינוי) ו-`…170000_add_payment_reminder_notification_type` (ה-worker שולח `payment_reminder`), וגם בלי `20261017120000` ו-`20261018120000` (דף ההזמנה, `/account` ו-`/admin/waitlist*`). לפרוס רק דרך `scripts/deploy.sh`, שמאמת את מספר המיגרציות (סעיף 4).
+- **רק בבדיקות יחידה/סטטיות, לא נבדק בדפדפן אחרי הפריסה לשרת הפיתוח:** רשימת ההמתנה לפי תאריך (הרשמה, התראה לספר, התראה ללקוח כשמתפנה תור בטווח), מסך `/admin/waitlist-settings`, בקשות שינוי מועד (אישור/דחייה), תזכורת התשלום, הקלדת השעה, וחלון ההרשאה ל-Push בהקשה הראשונה.
+- **תזכורת תשלום והניקוי הלילי פעילים בשרת הפיתוח** ופועלים על נתונים אמיתיים (הניקוי רץ בפועל ב-00:00 ב-2026-10-18 ומחק תור מאושר אחד, התראת מנהל אחת והתראת "לקוח חדש" אחת).
+- **כפתור "ניהול לקוחות" בתפריט הניהול עדיין מבצע `deleteHistoryAction`** (מחיקת כל ההיסטוריה) — רק התווית והצבע שונו (סעיף 8). אין מסך "ניהול לקוחות" נפרד; להחליט אם להחזיר את התווית או לבנות את המסך.
 - **פרודקשן אמיתי (Docker, `yossibarberbook.co.il`):** כניסה בקוד SMS **לא נפרסה** לפי המידע האחרון (2026-09-22) — דורשת `pnpm db:migrate` (migrations `20260922130000_add_login_codes` ואילך) והגדרת `CUSTOMER_LOGIN_MODE`/`SMS_PROVIDER`/פרטי 019sms ב-`.env` שם. מצב ההעברה לשרת החדש מתועד ב-`docs/DEPLOY.md`; לאמת מול השרת לפני הנחות.
 - **IVR:** נבדק מול שיחות אמיתיות כולל **כתיבת תור בפועל** (2026-08-08). **לא נבדק:** סימון "נקבע בטלפון" אצל הספר (רק `tsc`/טסטים), שילוב IVR + כניסת SMS, והפניית ה-`api_link` בימות המשיח לדומיין האמיתי בפרודקשן (DEPLOY שלב 5) — לא אומת שבוצעה.
 - **worker:** `pnpm build` (`tsc`) + `node dist/index.js` לא עובד (ראו סעיף 4) — רץ דרך `tsx`. בשרת הפיתוח רץ תחת pm2 בשם `barberbook-worker`; `pm2 save` הורץ 2026-10-14 (ה-dump כולל גם `barberbook-web` וגם את ה-worker) — ישרוד אתחול שרת.
 - **איפוס סיסמה** (`forgotPasswordAction`) לא שולח כלום ב-`password` mode (`getSmsProvider()` הוא Noop). ב-`sms_code` mode הוא סגור ממילא.
 - **אין revocation לסשן** בעת reset סיסמה (JWT stateless) — דורש החלטה אדריכלית (ראו סעיף 12).
 - **בדיקה ידנית בדפדפן שטרם נעשתה:** FR-28 (שעה שעברה נעלמת מהרשימה), US-025 (הודעת הרחבת שעות אמיתית), מתג `notify_freed_slots`.
-- **שיפורים לא-חוסמים לכניסת SMS** (הגבלת קו נייח, WebOTP, ניקוי קוד הרשמה/סיסמה ישן): סעיף 5 ב-`docs/SMS-LOGIN.md`.
+- **שיפורים לא-חוסמים לכניסת SMS** (WebOTP, ניקוי קוד הרשמה/סיסמה ישן; הגבלת קו נייח **בוצעה** 2026-10-18): סעיף 5 ב-`docs/SMS-LOGIN.md`.
 - **סימון "נקבע בטלפון"** לא מוצג בדפי בקשות-אישור/ביטול ובהתראת המנהל על תור חדש (אפשר להוסיף). תורי IVR לפני 2026-09-22 לא מסומנים.
 - **שלוש שדרוגי תלויות נדחו בכוונה** (Prisma 7, TypeScript 7, ESLint 10) — ראו סעיף 14.
 
@@ -98,14 +104,14 @@ Browser / Mobile Web (PWA)
    → Next.js App Container (מסכי לקוח, מסכי ניהול, Server Actions, API ל-IVR, Auth)
    → PostgreSQL
    ↑
-Worker Container — תזכורות לפני תור (in-app + push, בלי SMS), ניקוי קודי כניסה ישנים
+Worker Container — תזכורות לפני תור ותזכורת תשלום (in-app + push, בלי SMS), ניקוי קודי כניסה ישנים, ניקוי לילי (00:00 ישראל)
 ```
 
 **מונוריפו pnpm:** `apps/web` (Next.js 16) · `apps/worker` (node-cron) · `packages/db` (Prisma + `web-push`) · `packages/shared` (קבועים, SMS providers, עזרי זמן). `packages/*` נצרכים כמקור TS ישיר (בלי build step משלהם).
 
 ### הרצה ו-build
 - **`pnpm dev` / `pnpm build` בלבד — לעולם לא `next build`/`next dev` ישירות.** Next 16 משתמש ב-Turbopack כברירת מחדל ו-Serwist (webpack) מתנגש איתו; `apps/web/package.json` מגדיר `next dev --webpack` ו-`next build --webpack`. בלי הדגל `dev` קורס ("This build is using Turbopack, with a `webpack` config…").
-- `pnpm test` (בתוך `apps/web`) — `node --import tsx --test src/**/*.test.ts`. טסטים קיימים: `availability`, `dayTimeline`, `contacts`, `pushEndpoint`, `sms019`, `smsLoginCore`.
+- `pnpm test` (בתוך `apps/web`) — `node --import tsx --test src/**/*.test.ts`. טסטים קיימים: `availability`, `dayTimeline`, `contacts`, `pushEndpoint`, `sms019`, `smsLoginCore`, `validation` (נרמול טלפון, ניידים בלבד), `waitlistPeriods` (טווחי רשימת המתנה).
 - **אתחול שרת הפיתוח (pm2):** `pm2` לא ב-PATH — נמצא ב-cache של npx: `~/.npm/_npx/5f7878ce38f1eb13/node_modules/.bin/pm2` (או `npx pm2`). נוהל: `pnpm build` מתוך `apps/web` (בדיקה קודם ש-`pgrep -af "next build"` ריק) → `pm2 restart barberbook-web barberbook-worker` → `pm2 save` → בדיקת `/login` = 200 ולוגים נקיים. שרת זה הוא שרת פיתוח (ה-IVR מופנה אליו דרך ngrok); הפרודקשן האמיתי ב-Docker, ראו `docs/DEPLOY.md`.
 - **worker:** `pnpm build`/`node dist/index.js` לא עובד כי `packages/*` הם TS גולמי ו-Node CommonJS לא מפענח אותם. מריצים דרך `pnpm exec tsx --env-file=.env src/index.ts` (בלי `--watch` לריצה ארוכה); `pnpm worker` מהשורש = `tsx watch` לפיתוח. דורש `apps/worker/.env` עם `DATABASE_URL` (+ `VAPID_*` לפוש). זה dev-runtime ולא בינארי מקומפל — וזה בסדר, גם ב-Docker.
 - **תיקון timezone:** Server Components רצים בשעון השרת, לא בישראל. כל תצוגת זמן חייבת `ISRAEL_TIME_ZONE` מפורש; `zonedTimeToUtc()` (`packages/shared`) ממיר שעון קיר ישראלי (כולל שעון קיץ/חורף, בלי ספריית tz) ל-UTC לכל טפסי הניהול. `formatIsraelDate`/`formatIsraelTime` ב-`packages/shared` (משותפים ל-web ול-worker).
@@ -140,9 +146,9 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 
 **אינדקס (2026-10-14):** `Appointment @@index([status, starts_at])` (migration `20261014120000_add_appointment_status_starts_at_index`) — משרת את שאילתת התזכורות של ה-worker שרצה כל דקה. `getEarliestAvailability` (IVR) טוענת את כל הימים הפתוחים בשאילתה אחת עם `breaks`/`blocked_times`/`appointments` במקום שאילתה לכל יום, באותה לוגיקת `findAvailableSlots`.
 
-**ישויות:** `User` (role: customer/administrator) · `Barber` (`is_primary`, `is_active`) · `Service` (`duration_minutes`, `is_child_service`, `is_manual_only`) · `WorkDay` (`barber_id`, `is_blocked`) · `WorkBreak` · `BlockedTime` · `Appointment` (status: scheduled/cancelled; attendee_type: self/child/other; `booked_via_ivr`) · `CancellationRequest` · `BookingRequest` · `AppSettings` (סינגלטון: `requires_approval`, `ivr_enabled`) · `WaitlistEntry` (`notify_freed_slots`) · `Notification` · `PushSubscription` · `Announcement` · `BlockedPhoneNumber` · `PasswordResetCode` · `LoginCode` · `ContactName`.
+**ישויות:** `User` (role: customer/administrator) · `Barber` (`is_primary`, `is_active`) · `Service` (`duration_minutes`, `is_child_service`, `is_manual_only`) · `WorkDay` (`barber_id`, `is_blocked`) · `WorkBreak` · `BlockedTime` · `Appointment` (status: scheduled/cancelled; attendee_type: self/child/other; `booked_via_ivr`) · `CancellationRequest` · `BookingRequest` · `AppSettings` (סינגלטון: `requires_approval`, `ivr_enabled`, `waitlist_periods` JSON) · `WaitlistEntry` (`notify_freed_slots`) · `WaitlistDateEntry` (user + `work_day_id` + `period`) · `RescheduleRequest` · `Notification` · `PushSubscription` · `Announcement` · `BlockedPhoneNumber` · `PasswordResetCode` · `LoginCode` · `ContactName`.
 
-**Migrations (בסדר כרונולוגי):** `init` → `service_name_unique` → `add_is_child_service` → `add_blocked_phone_numbers` → `add_notifications_and_waitlist` → `add_approval_toggle` → `add_work_day_is_blocked` → `add_barbers_table` + `barber_id_required` (2026-08-03) → `add_ivr_enabled` → `add_push_subscriptions_and_notification_types` (09-06) → `add_customer_registered_notification_type` → `add_appointment_booked_via_ivr` → `add_login_codes` (09-22) → `add_contact_names` + `add_manual_only_services` (10-05) → `add_waitlist_notify_freed_slots` (10-06).
+**Migrations (בסדר כרונולוגי):** `init` → `service_name_unique` → `add_is_child_service` → `add_blocked_phone_numbers` → `add_notifications_and_waitlist` → `add_approval_toggle` → `add_work_day_is_blocked` → `add_barbers_table` + `barber_id_required` (2026-08-03) → `add_ivr_enabled` → `add_push_subscriptions_and_notification_types` (09-06) → `add_customer_registered_notification_type` → `add_appointment_booked_via_ivr` → `add_login_codes` (09-22) → `add_contact_names` + `add_manual_only_services` (10-05) → `add_waitlist_notify_freed_slots` (10-06) → `add_appointment_status_starts_at_index` (10-14) → `add_waitlist_date_entries` · `add_reschedule_requests` · `add_waitlist_joined_notification` · `add_payment_reminder_notification_type` (10-17) → `add_waitlist_periods_setting` (10-18). **כל המיגרציות מ-10-17 הורצו בשרת הפיתוח בלבד.**
 
 ### הערות מודל חשובות
 - `Appointment.booked_by_user_id` אופציונלי — תור ידני יכול להתקיים בלי חשבון משתמש.
@@ -154,7 +160,9 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 - לכל תור: בקשת ביטול (`CancellationRequest`) אחת לכל היותר — `appointment_id @unique`, לכן בקשה שנדחתה חוזרת ל-`pending` בבקשה נוספת במקום שורה חדשה; ובקשת תור (`BookingRequest`) אחת לכל היותר.
 - `BookingRequest` אינה "כוונה": ה-`Appointment` נוצר מיד כ-`scheduled` ותופס את השעה; דחייה → `cancelled` ושחרור השעה; אישור לא נוגע בתור. אין `booking_request_id` ב-`Notification` — `booking_decision` מצביעה על `appointment_id`.
 - `AppSettings` — שורה יחידה קבועה (`id = "singleton"`, get-or-create ב-`settings.ts`); הגדרות גלובליות נוספות = עמודות נוספות באותה שורה, לא key-value.
-- `WaitlistEntry` כללית במכוון (לא לפי תאריך/שירות); `user_id @unique` → הצטרפות חוזרת = no-op.
+- `WaitlistEntry` כללית במכוון (לא לפי תאריך/שירות); `user_id @unique` → הצטרפות חוזרת = no-op. **לצידה** `WaitlistDateEntry` — רישום לפי יום עבודה וטווח שעות (`@@unique[user_id, work_day_id, period]`, cascade עם היום והמשתמש; `period` = `morning|afternoon|evening`). שתי הרשימות עצמאיות.
+- `RescheduleRequest`: אחת לתור (`appointment_id @unique`), `new_work_day_id`/`new_starts_at` ללא FK; רק כשהמדיניות דלוקה.
+- `AppSettings.waitlist_periods` (JSON, null = ברירות מחדל): `[{key, enabled, from, to}]` ל-3 הטווחים; נקרא/נכתב רק דרך `lib/actions/waitlistSettings.ts`.
 - `WorkDay`: ייחודיות `[barber_id, work_date]` — שני ספרים יכולים לפתוח את אותו תאריך. `Barber ← WorkDay` הוא `onDelete: Restrict`.
 - `LoginCode` ו-`ContactName` מפתחים לפי **מספר טלפון** ולא `User` (משתמש חדש עדיין לא קיים; איש קשר יכול להיות מספר שטרם נרשם).
 - אין סטטוס "הסתיים" לתור — תור היסטורי נשאר `scheduled` לנצח (ראו הכלל על בדיקת `starts_at >= now` בסעיף 6).
@@ -171,10 +179,12 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
   - דלוקה: קביעה נשמרת כ-`BookingRequest` ממתין (התור כבר תופס את השעה); ביטול נשמר כ-`CancellationRequest` ממתינה — רק החלטת הספר קובעת.
   - כבויה: שניהם קורים **מיידית**. אל תניחו שביטול/קביעה תמיד דורשים אישור — בדקו `getRequiresApproval()`.
 - **שינוי תור כשהמדיניות דלוקה** (2026-10-17): לקוח שמשנה תור מאושר יוצר `RescheduleRequest` (אחת לתור, `appointment_id @unique`); התור נשאר בשעה הישנה עד שהספר מאשר ב-`/admin/reschedule-requests`; השעה החדשה **לא** נתפסת בזמן ההמתנה ונבדקת מחדש באישור (`SLOT_TAKEN` → הספר דוחה). תור שעדיין ממתין לאישור קביעה ממשיך לעקוב אחרי ההעברה כמקודם. מדיניות כבויה → העברה מיידית. לוגיקה משותפת ב-`lib/rescheduleCore.ts`. Migration: `20261017150000_add_reschedule_requests` (**טרם הורצה**).
+- **טלפון (מ-2026-10-18):** `normalizeIsraeliPhone` (`packages/shared`) ממיר `+972…`/`972…`/`00972…` ופורמטים עם רווחים/מקפים לצורה המקומית `05XXXXXXXX` — זו הצורה היחידה שנשמרת ב-DB ונשלחת ל-SMS. `phoneSchema` (`lib/validation.ts`) מנרמל; `mobilePhoneSchema` מוסיף ניידים בלבד (`05XXXXXXXX`) ונאכף ב**כניסת/הרשמת לקוחות** (קוד SMS והרשמה בסיסמה). קו נייח/VoIP מקבל "יש להזין מספר נייד שמקבל SMS". לא נאכף בכניסת מנהל, חסימות, אנשי קשר ו-IVR.
 - **חסימת יום** נאכפת בשלוש שכבות: `getOpenDates()` (לא מציגה), `bookAppointmentAction`/`rescheduleAppointmentAction` (זורקות `DAY_BLOCKED`). לא חל על קביעה ידנית של הספר.
 - **חסימת מספרי טלפון** (`BlockedPhoneNumber`) נאכפת בהרשמה, בכניסה (שליחת קוד ואימות), בקביעה ובשינוי תור — גם למספרים שטרם נרשמו.
 - **הודעת ביטול על תור — תמיד לבדוק `starts_at >= new Date()`** ולא רק `status === "scheduled"` (תקלה אמיתית שתוקנה ב-`deleteWorkDayAction`/`deleteAllWorkDaysAction` (הוסרה מאז)/`cancelAppointmentAction`: תור היסטורי עלול לגרום להודעת "בוטל" מטעה).
 - מחיקת יום/תור דורשת הודעת אזהרה ואישור מפורש.
+- **ניקוי לילי (worker, 00:00 ישראל — `purgeFinishedDay`):** מוחק (א) התראות מנהל מסוג תור חדש/בקשת תור/ביטול/שינוי מועד/שינוי תור שהתור שלהן כבר הסתיים — בכל סטטוס, גם בקשה שלא טופלה; (ב) התראות מנהל "לקוח חדש" ו"נרשמו לרשימת המתנה" מלפני חצות; (ג) תורים שהספר **אישר** (`BookingRequest.status = approved`) והסתיימו. תורים שלא אושרו/לא דרשו אישור/בוטלו **לא** נמחקים. התראות של לקוחות לא נמחקות (פרט ל-cascade עם תור שנמחק). אידמפוטנטי — לילה שפוספס נתפס בלילה הבא.
 - איפוס סיסמה — קוד חד-פעמי ב-SMS, לא מייל (רלוונטי רק במצב `password`).
 - הרשאות: מסכי ניהול רק ל-`administrator`; לקוח לא מחובר לא יכול לערוך תורים. `account/appointments` מסנן `starts_at >= now` — הלקוח לא רואה תורי עבר.
 
@@ -188,6 +198,7 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 - **כלל: ספר פעיל אחד ⇒ שלב בחירת הספר לא מוצג.** `requestBarbers()` ב-`book/page.tsx` בוחר אותו אוטומטית וקופץ ישר ל"תאריך" (כך גם ב-`bookAnother`, וב-IVR — החלטה #4). מסך "בחרו ספר" מופיע רק כשיש 2+ ספרים פעילים; אם הוא הופיע ללקוח כשיש ספר אחד — הטעינה נכשלה (ראו הבא).
 - **טעינת הספרים (מ-2026-10-07):** שלושה מצבים נפרדים — `barbersLoading` ("טוען..."), `barbersError` (הודעה + כפתור "נסו שוב"), ורק אחרי טעינה מוצלחת עם 0 תוצאות "אין כרגע ספרים זמינים". קודם כשל בשרת (למשל Server Action ישן אחרי deploy) הוצג כ"אין ספרים". גם כשל ב-`getOpenDates` מציג שגיאה במקום להיתקע.
 - **מ-2026-10-05, בחירת שעה לא קובעת מיד:** צעד `summary` מציג כרטיס "סיכום פרטי התור" (ספר, שירות, ילד, תאריך, שעה — בעיצוב גרדיאנט כמו כרטיסי ההודעות ב-`/account`, שורות `תווית: ערך` ב-RTL) עם "אישור" (רק הוא קורא ל-`bookAppointmentAction`) ו"ביטול" (חזרה להתחלה, `bookAnother`). אפשר לקבוע תור נוסף באותה זרימה.
+- **"לא מצאת שעה שמתאימה לך?" (2026-10-17):** בשלבי "טווח" ו"שעה" כפתור "כנס/י לרשימת המתנה" פותח קוביות ריבועיות (עיצוב כרטיס "סיכום פרטי התור", קטן, שורה אחת) — רק הטווחים שהספר סימן ב-`/admin/waitlist-settings`, עם שעות `09:00-13:00`. בחירה = `joinDateWaitlistAction(work_day_id, period)` — רשום **לאותו יום בלבד**; אפשר כמה טווחים. הספר מקבל `waitlist_joined` ונראה את הרישום ב-`/admin/waitlist`.
 - **מצב "אין ימים פתוחים":** מנוסח "התרע/י לי כשייפתחו תאריכים לקביעת תורים" — אותו מנגנון רשימת המתנה, ניסוח ממוקד.
 - כשהמדיניות דלוקה: מסך "הבקשה שלך נשלחה לאישור הספר" (`pendingApproval: true`).
 
@@ -197,11 +208,11 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 - **גם בזמן ההמתנה לאישור תור** (מ-2026-10-05) הלקוח יכול לשנות מועד או לבטל: שינוי מועד משאיר את ה-`BookingRequest` ב-`pending` לשעה החדשה (הספר מקבל התראה "עדיין ממתין לאישורך"); ביטול מיידי בלי אישור ספר — `requestCancellationAction` **מוחקת** את ה-`BookingRequest` (`deleteMany` מותנה ב-`pending`; אין סטטוס `withdrawn`) ומבטלת את התור. `decideBookingRequest` משתמשת ב-`updateMany` מותנה ב-`pending` כדי לא לקרוס אם הלקוח ביטל באותו רגע.
 
 ### דף הבית (`/account`)
-הודעות כלליות של הספר (חדשה קודם), תיבת רשימת המתנה (כולל `LeaveWaitlistButton` ומתג `FreedSlotNotifyToggle`), הפעלת Push (`<PushNotificationToggle audience="customer"/>`).
+הודעות כלליות של הספר (חדשה קודם), תיבת רשימת המתנה (כולל `LeaveWaitlistButton` ומתג `FreedSlotNotifyToggle`) ורשימת "ממתין/ה לתור פנוי בתאריכים", הפעלת Push (`<PushNotificationToggle audience="customer"/>`). **ברירת מחדל דלוקה (2026-10-18):** במכשיר שעוד לא נשאל, ההקשה הראשונה באפליקציה מעלה את חלון ההרשאה של המערכת (חייבת מחווה של משתמש — iOS, וכרום חוסם בלעדיה); נשאל פעם אחת למכשיר (`localStorage` `push-auto-asked`); מי שדחה מפעיל ידנית. לא נכפה על המנהל.
 - **הודעות כלליות** (`Announcement`, US-009): מפורסמות ב-`/admin/announcements`; תצוגה באפליקציה + Push לכל מנויי הלקוחות (בלי שורת `Notification`, בלי SMS; ללא Push על עריכה/מחיקה). כרטיס ההודעה: `bg-gradient-to-bl from-barber-teal to-cream`, טקסט `text-ink` (לבן נעלם על הקצה הבהיר).
 
 ### רשימת המתנה (US-022..US-025, `waitlist.ts`)
-כללית, לא לפי תאריך/שירות. צד לקוח: `joinWaitlistAction`/`leaveWaitlistAction`/`isOnWaitlist`/`getMyWaitlistEntry`/`setNotifyFreedSlotsAction`. צד ספר: `getWaitlistEntries`/`removeWaitlistEntryAction` (`/admin/waitlist`; הסרה ידנית בלי הודעה ללקוח). פירוט הטריגרים — סעיף 9.
+שתי רשימות: **כללית** (לא לפי תאריך/שירות) ו**לפי תאריך** (`WaitlistDateEntry`, מ-2026-10-17; `joinDateWaitlistAction`/`getMyDateWaitlistEntries`/`leaveDateWaitlistEntryAction`, מוצגת ב-`/account` ב-`DateWaitlistList` עם הסרה; "הסרה מהרשימה" הכללית מוחקת גם אותה). צד לקוח: `joinWaitlistAction`/`leaveWaitlistAction`/`isOnWaitlist`/`getMyWaitlistEntry`/`setNotifyFreedSlotsAction`. צד ספר: `getWaitlistEntries`/`removeWaitlistEntryAction` (`/admin/waitlist`; הסרה ידנית בלי הודעה ללקוח). פירוט הטריגרים — סעיף 9.
 
 ### לוח שנה — שני מימושים נפרדים
 - **לקוח** (`DateCalendar` בתוך `account/book/page.tsx`): רשת חודשית RTL (יום ראשון מימין); רק תאריכים מ-`getOpenDates()` לחיצים (עיגול טורקיז), השאר דהויים; ניווט חודשים רק בין חודשים שיש בהם תאריך פתוח. שעות פנויות — כפתורי פיל `rounded-full`.
@@ -214,14 +225,15 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 כל המסכים תחת `requireAdmin()` + matcher ב-`proxy.ts` (סעיף 12).
 
 ### מסך ראשי (עוצב מחדש 2026-09-21)
-- **תפריט** (`AdminMenu`): לקוחות חסומים · רשימת המתנה · הודעות כלליות · הגדרות · ניהול ספרים · אנשי קשר. **שלושה כפתורים גדולים מוערמים** (`w-64 mx-auto`) עם badge ספירה: בקשות תורים · בקשות ביטול · התראות.
+- **תפריט** (`AdminMenu`): אנשי קשר · לקוחות חסומים · רשימת המתנה · **ניהול רשימת המתנה** · הודעות כלליות · היסטוריה וגיבוי · הגדרות · ניהול ספרים; בתחתיתו הכפתור `DeleteHistoryMenuItem` (ראו בהמשך). **ארבעה כפתורים גדולים מוערמים** (`w-64 mx-auto`) עם badge ספירה: בקשות תורים · **בקשות שינוי תור** · בקשות ביטול · התראות.
 - **"היום הרלוונטי":** `getWorkDaysAdmin` מסנן לפי `ends_at >= now()` (לא לפי תאריך בלבד) — יום ששעותיו הסתיימו נעלם מהתצוגה המהירה וגם מרשימת "ימי עבודה פתוחים" (לא נמחק מה-DB). `workDays[0]` = היום הפתוח האמיתי הבא.
 - **`QuickDayAppointments`** (`admin/QuickDayAppointments.tsx`) — רכיב משותף למסך הראשי ול-`/admin/day/[id]` (עם `showMoveButton`): ציר זמן (`buildDayTimeline`) עם "ביטול תור" לכל תור ו"קביעת תור ידני" לכל שעה פנויה (פותח `CreateManualAppointmentForm` inline עם `initialStartsAt`/`onCancel`). **מ-2026-10-05 טווחים פנויים מפוצלים לשעות בודדות** (`splitFreeSegments`, רשת 10 דקות כמו אצל לקוח, כל שעה מוצגת בזמן ההתחלה שלה).
 - כפתורי פעולה קטנים אחידים: `bg-barber-teal text-cream-text rounded-full px-3 py-1 text-xs font-medium`. שעה פנויה: `text-ink font-bold` עם המילה "פנוי" בלבד באדום (`text-red-600`).
-- **מחיקת היסטוריה** (`DeleteHistoryMenuItem` → `deleteHistoryAction`, בתוך `AdminMenu`; מ-2026-10-07) — מוחקת ימים/תורים שעברו בלבד. כפתור "מחיקת כל היומן" (`DeleteAllWorkDaysButton`/`deleteAllWorkDaysAction`) הוסר.
+- **מחיקת היסטוריה** (`DeleteHistoryMenuItem` → `deleteHistoryAction`, בתוך `AdminMenu`; מ-2026-10-07) — מוחקת ימים/תורים שעברו בלבד. כפתור "מחיקת כל היומן" (`DeleteAllWorkDaysButton`/`deleteAllWorkDaysAction`) הוסר. **⚠️ מ-2026-10-17 הכפתור מוצג בתווית "ניהול לקוחות" (טורקיז) אבל עדיין מפעיל `deleteHistoryAction` וחלון האישור עדיין אומר "למחוק לצמיתות"** — שינוי של סוכן אחר שנשאר בכוונת המשתמשת; אין מסך "ניהול לקוחות".
 - **רענון אוטומטי (2026-10-07):** `admin/layout.tsx` מציג `AdminAutoRefresh` — `router.refresh()` כל 45 שניות כשהטאב גלוי, ומיד כשחוזרים אליו (`visibilitychange`). ה-badge (`getUnreadAdminNotificationCount`) והרשימות נספרים בשרת בטעינה, ולכן בלי זה מנהל עם דף פתוח לא רואה התראה חדשה עד רענון ידני. מצב הטפסים בצד לקוח נשמר. זה **גיבוי** ל-Push, לא תחליף לו (טאב סגור — לא קורה כלום).
 
 ### ימי עבודה
+- **שעות בהקלדה (2026-10-17):** בפתיחת יום (התחלה, סיום, הפסקות) ובעדכון שעות — `components/TimeInput.tsx` (HH:MM, ספרות בלבד, נקודתיים אוטומטי, `inputMode=numeric`, `pattern` חוסם שליחה לא תקינה) במקום `type="time"`.
 - פתיחת יום (תאריך, שעות, הפסקות דינמיות); **עדכון שעות** של יום פתוח (נחסם אם יש תור/הפסקה/חסימה מחוץ לטווח החדש); צפייה בתורי יום (`/admin/day/[id]`).
 - **העברת תור** (`MoveAppointmentButton`) לשעה אחרת באותו יום — `Notification`+Push (בלי SMS) ללקוח עם חשבון (תור ידני ללא חשבון מועבר בלי הודעה).
 - **ביטול תור בודד** (`CancelAppointmentButton`, US-017) — שולח `Notification`+Push ללקוח מקושר, ומפעיל התראת רשימת המתנה אם השעה עתידית.
@@ -233,6 +245,9 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 **ללא בחירת שירות** (מ-2026-10-05): הספר בוחר שם (בלי טלפון) + משך (5/10/15 דק', `MANUAL_APPOINTMENT_DURATIONS`). כל משך ממופה לשירות מוסתר (`Service.is_manual_only`, נוצרים ב-migration `add_manual_only_services` וב-seed) כדי ש-`Appointment.service_id` יישאר חובה וכל חישובי המשך/העברה יעבדו. `getServices` מסנן אותם; `bookAppointmentCore` דוחה אותם כרשת ביטחון. תור ידני אינו מפעיל התראת מנהל.
 
 ### בקשות, הגדרות וחסימות
+- **בקשות שינוי תור** (`/admin/reschedule-requests`, `rescheduleRequests.ts`): אישור מזיז את התור (בדיקה מחדש של השעה בטרנזקציה Serializable) ושולח `reschedule_decision`; דחייה משאירה. badge: `getPendingRescheduleCount()`. הלקוח יכול למשוך בקשה (`withdrawRescheduleRequestAction`).
+- **רשימת המתנה** (`/admin/waitlist`): "ממתינים לפי תאריך" (לפי יום וספר, עם הטווח שנבחר, פרטי קשר והסרה) ו"רשימה כללית".
+- **ניהול רשימת המתנה** (`/admin/waitlist-settings`, 2026-10-18): הספר מסמן בהקשה אילו מ-בוקר/צהריים/ערב יוצגו ללקוח ומקליד שעות לכל אחד (ברירת מחדל 09:00-13:00 / 13:00-17:00 / 17:00-20:00). ולידציה (`validateWaitlistPeriods`): לפחות טווח אחד, התחלה לפני סיום, בלי חפיפה בין טווחים מוצגים. מה שהוגדר הוא מה שהלקוח רואה **וגם** מה שקובע התראות: תור שהתפנה מחוץ לכל הטווח המוצג לא מודיע לרשימות לפי תאריך; טווח שכובה לא מקבל התראות (הרישומים נשארים). שמור ב-`AppSettings.waitlist_periods`.
 - **בקשות תורים** (`/admin/booking-requests`, US-019/US-020): אישור לא נוגע בתור; דחייה → `cancelled` + `notifyWaitlistOfFreedSlot` (אם עתידית) + `booking_decision` ללקוח. badge: `getPendingBookingRequestCount()`.
 - **בקשות ביטול** (`/admin/cancellation-requests`, US-008).
 - **הגדרות** (`/admin/settings`): `ApprovalToggle` (`requires_approval`), `IvrToggle` (`ivr_enabled`).
@@ -246,6 +261,8 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 - `WaitlistEntry` ו-`AppSettings.requires_approval` **אינם** מודעים-לספר — נשארו גלובליים בכוונה.
 
 ### אנשי קשר (`ContactName`, 2026-10-05; `/admin/contacts`)
+**מ-2026-10-17 הרשימה ב-`/admin/contacts` מציגה רק לקוחות שנרשמו ב-48 השעות האחרונות** + מספרים ששמרת להם שם שלא נרשמו (`getCustomerContacts`); לקוחות ישנים נשארים חשבונות מלאים ושמם מוצג בכל שאר מסכי הניהול.
+
 הספר רואה כל לקוח **לפי השם ששמור אצלו בטלפון** (נופל לשם שהלקוח נרשם איתו), עם מספר הטלפון וכפתורי חיוג/SMS/וואטסאפ — בכל מסכי `/admin` (תורי יום, בקשות תורים/ביטול, רשימת המתנה, חסומים, ייצוא יום).
 - **רכיבים:** `CustomerContact` + `ContactActions` (`components/CustomerContact.tsx`, כולל ✎ לעריכה ידנית), `getContactNameMap` (`lib/contactNames.ts`, server-only), `lib/contacts.ts` (`normalizeIsraeliPhone`, `whatsappUrl`, `parseVCards` — קורא .vcf כולל שורות מקופלות ו-QUOTED-PRINTABLE של עברית), `lib/actions/contacts.ts`.
 - **שלושה מקורות (`ContactNameSource`):** `import` (ייבוא .vcf — מסונן בדפדפן מול `getKnownCustomerPhones()`, כך שרק לקוחות/חסומים קיימים נשלחים לשרת), `picker` (Android Contact Picker — נשמר גם למספר שטרם נרשם, ודורס), `manual` (עריכה ידנית). **ייבוא חוזר לעולם לא דורס שורת `manual`.** שם ריק מוחק (חזרה לשם הרשום).
@@ -269,25 +286,21 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 - ה-worker צריך את `VAPID_*` ב-`apps/worker/.env` (ב-Docker `env_file` משותף).
 
 ### התראות לספר (`notifyAdmin.ts`, helper אחד `notifyAdmins`)
-תור חדש (אתר + IVR) · בקשת תור ממתינה · בקשת ביטול ממתינה · שינוי מועד ע"י לקוח (`notifyAdminsOfCustomerReschedule`) · ביטול מיידי ע"י לקוח כשהמדיניות כבויה (`notifyAdminsOfCustomerCancellation`) · לקוח חדש (`notifyAdminsOfNewCustomer` → `customer_registered`, נקרא מ-`registerUserCore` ולכן מכסה גם הרשמה בטלפון).
-- `NotificationType`: `appointment_reminder`, `appointment_changed`, `cancellation_decision`, `appointment_booked`, `waitlist_slot_available`, `booking_decision`, `booking_request_pending`, `cancellation_request_pending`, `customer_registered`.
+תור חדש (אתר + IVR) · **נרשמו לרשימת המתנה** (`notifyAdminsOfWaitlistJoin`, בכל רישום חדש כללי או לפי תאריך+טווח; Push ל-`/admin/waitlist`) · **בקשת שינוי תור ממתינה** (`notifyAdminsOfRescheduleRequest`) · בקשת תור ממתינה · בקשת ביטול ממתינה · שינוי מועד ע"י לקוח (`notifyAdminsOfCustomerReschedule`) · ביטול מיידי ע"י לקוח כשהמדיניות כבויה (`notifyAdminsOfCustomerCancellation`) · לקוח חדש (`notifyAdminsOfNewCustomer` → `customer_registered`, נקרא מ-`registerUserCore` ולכן מכסה גם הרשמה בטלפון).
+- `NotificationType`: `appointment_reminder`, `appointment_changed`, `cancellation_decision`, `appointment_booked`, `waitlist_slot_available`, `booking_decision`, `booking_request_pending`, `cancellation_request_pending`, `customer_registered`, `reschedule_request_pending`, `reschedule_decision`, `waitlist_joined`, `payment_reminder`. סוגים שמוצגים במסך ההתראות של הספר (`ADMIN_NOTIFICATION_TYPES`): תור חדש · בקשת תור · בקשת ביטול · שינוי תור · בקשת שינוי תור · לקוח חדש · נרשמו לרשימת המתנה.
 - כשהמדיניות כבויה כל תור שלקוח קובע יוצר `appointment_booked` לכל מנהל (תור ידני — לא). badge ב-`/admin` סופר `read_at IS NULL`; `markAdminNotificationsReadAction` = "סמן הכל כנקרא" (`updateMany`), אין סימון פר-שורה. `adminNotifications.ts` מסנן לפי `ADMIN_NOTIFICATION_TYPES` (באג שתוקן: בעבר סינן רק `appointment_booked` ולכן בקשות ממתינות לא הופיעו).
 
 ### התראות ללקוח
-שינוי/ביטול תור ע"י הספר (כולל מחיקת יום/יומן/ספר) · החלטה על בקשת תור/ביטול · רשימת המתנה · **תזכורת לפני תור** (worker, `reminders.ts`: כל דקה, תורים `scheduled` עם חשבון שמתחילים בתוך `APPOINTMENT_REMINDER_LEAD_MINUTES` = 120 דק' וללא `Notification` מסוג `appointment_reminder` — האידמפוטנטיות מסתמכת רק על הבדיקה הזו; Notification+Push. **מ-2026-10-14** כל תור בלולאה בתוך `try/catch` משלו — כשל שליחה אחד לא עוצר את השאר, ואין Notification נכתב ולכן נוסה שוב בדקה הבאה).
+שינוי/ביטול תור ע"י הספר (כולל מחיקת יום/יומן/ספר) · החלטה על בקשת תור/ביטול · רשימת המתנה · **תזכורת תשלום** (worker, `sendDuePaymentReminders`: `PAYMENT_REMINDER_DELAY_MINUTES` = 30 דק' אחרי תחילת התור, רק תורים `scheduled` עם חשבון שאינם ממתינים לאישור, עד 6 שעות אחורה; אידמפוטנטי לפי `Notification` מסוג `payment_reminder`; Notification+Push ו-`getSmsProvider()` שהוא Noop) · **החלטה על בקשת שינוי תור** (`reschedule_decision`) · **תזכורת לפני תור** (worker, `reminders.ts`: כל דקה, תורים `scheduled` עם חשבון שמתחילים בתוך `APPOINTMENT_REMINDER_LEAD_MINUTES` = 120 דק' וללא `Notification` מסוג `appointment_reminder` — האידמפוטנטיות מסתמכת רק על הבדיקה הזו; Notification+Push. **מ-2026-10-14** כל תור בלולאה בתוך `try/catch` משלו — כשל שליחה אחד לא עוצר את השאר, ואין Notification נכתב ולכן נוסה שוב בדקה הבאה).
 
 ### רשימת המתנה — שלושה טריגרים (`notifyAllWaitlistEntries`, `type: waitlist_slot_available`)
 1. **`notifyWaitlistOfFreedSlot(starts_at, service, owner_user_id)`** — תור עתידי שהתפנה: ביטול ישיר ע"י הספר, אישור/ביטול מיידי של בקשת ביטול, דחיית בקשת תור, **וגם העברת תור (ע"י לקוח או ספר) — השעה הישנה שהתפנתה** (נוסף 2026-10-05, commit `542d4e0`; מותנה בכך שהשעה הישנה עתידית ושונתה בפועל; כשל התראה נרשם בלוג ולא מכשיל את ההעברה). בעל התור מוחרג. **נשלח רק לחברי הרשימה שהשאירו דלוק `WaitlistEntry.notify_freed_slots`** (ברירת מחדל `true`; מתג "התראה כשמתפנה תור" ב-`/account`, `FreedSlotNotifyToggle`) — **שונה 2026-10-06**: עד אז נשלח גם לכל לקוח עם Push, וזה בוטל.
 2. **`notifyWaitlistOfExtendedHours`** — `updateWorkDayHoursAction` **מרחיבה** יום פתוח.
 3. **`notifyWaitlistOfNewWorkDay`** — `createWorkDayAction` פותחת יום חדש לגמרי (תוקן 2026-07-26: בלעדיו לקוח שהצטרף כשאין אף יום פתוח לא קיבל התראה).
 
-**רשימת המתנה פר-תאריך (2026-10-17):** בשלבי "טווח"/"שעה" בקביעת תור יש כפתור "לא מצאת שעה שמתאימה לך? כנס/י לרשימת המתנה" ← בוקר (9-13) / צהריים (13-17) / ערב (17-20). נשמר בטבלה `WaitlistDateEntry` (user + `work_day_id` + period, cascade עם היום) — **רק** לאותו יום עבודה (של אותו ספר). `notifyWaitlistOfFreedSlot` מוצאת את ה-`WorkDay` שמכסה את השעה ושולחת למי שנרשם ליום+טווח (`lib/waitlistPeriods.ts`); מי שגם ברשימה הכללית לא מקבל כפול. מוצג וניתן להסרה ב-`/account` (`DateWaitlistList`). Migration `20261017120000_add_waitlist_date_entries` — **טרם הורצה** בשום שרת. הוסר גם טקסט "N פנויים" מכפתורי הטווח.
+**רשימות לפי תאריך (`WaitlistDateEntry`, 2026-10-17/18):** טריגר 1 (`notifyWaitlistOfFreedSlot`) שולח גם למי שנרשם ל**יום העבודה** שמכסה את השעה שהתפנתה ול**טווח** שבו היא נמצאת (`waitlistPeriodOf(starts_at, getWaitlistPeriods())`; מחוץ לכל טווח מוצג — לא נשלח). בעל התור מוחרג; מי שגם ברשימה הכללית לא מקבל כפול (או לא מקבל כלל אם כיבה את המתג). טריגרים 2–3 (יום חדש/הרחבת שעות) פונים לרשימה הכללית בלבד. הרישום עצמו מודיע לספר (`waitlist_joined`). נמחק אוטומטית עם מחיקת היום.
 
-**הקלדת שעה ידנית (2026-10-17):** `components/TimeInput.tsx` (HH:MM, נקודתיים אוטומטי) מחליפה את `type="time"` בפתיחת יום ובעדכון שעות.
-
-**ניהול רשימת המתנה (2026-10-18):** `/admin/waitlist-settings` (תפריט: "ניהול רשימת המתנה") — הספר בוחר אילו מבין בוקר/צהריים/ערב יוצגו ללקוח ומגדיר שעות HH:MM לכל אחד (ברירת מחדל 09-13 / 13-17 / 17-20). נשמר ב-`AppSettings.waitlist_periods` (JSON; migration `20261018120000_add_waitlist_periods_setting`), לוגיקה ב-`lib/waitlistPeriods.ts`, פעולות ב-`lib/actions/waitlistSettings.ts`. ההגדרה קובעת גם את ההתראות: תור שהתפנה מחוץ לטווחים המוצגים לא מודיע לרשימות לפי תאריך.
-
-המתג `notify_freed_slots` חל **רק** על תור שהתפנה; יום חדש/הרחבת שעות נשלחים לכל הרשימה (זו הסיבה להיות בה). הצטרפות/עזיבת רשימה לא מודיעה לספר.
+המתג `notify_freed_slots` חל **רק** על תור שהתפנה; יום חדש/הרחבת שעות נשלחים לכל הרשימה (זו הסיבה להיות בה). הצטרפות לרשימה (כללית או לפי תאריך) מודיעה לספר; עזיבה — לא.
 
 ---
 
@@ -302,6 +315,7 @@ Worker Container — תזכורות לפני תור (in-app + push, בלי SMS),
 הדלקת הדגל בלי ספק תקף **לא** מפעילה את המצב (מונע נעילת לקוחות בחוץ). **`/login` הוא `force-dynamic`** (הצורה תלויה ב-env בזמן ריצה).
 
 ### מצב `sms_code`
+- **מספר טלפון (מ-2026-10-18):** מתקבל בכל צורת הקלדה (`050-123-4567`, `+972 50 123 4567`, `972…`, `00972…`) ומנורמל ל-`05XXXXXXXX` לפני כל שימוש (מגבלות קצב, חסימה, `LoginCode`, שליחת ה-SMS). רק ניידים (`05X`); קו נייח/VoIP → "יש להזין מספר נייד שמקבל SMS" (`mobilePhoneSchema`, `phoneError` ב-`smsLogin.ts`). הקידומת רחבה בכוונה (כל `05X`) — מספר `05X` שלא קיים עדיין יעבור (אי אפשר לזהות בלי HLR). לקוחות IVR עם קו נייח קיימים נשארים חשבונות אבל לא ייכנסו לאפליקציה.
 - זרימה: `smsLoginAction` (`lib/actions/smsLogin.ts`, שלבים `send`/`verify`/`signup`); לוגיקת הקודים ב-`lib/smsLoginCore.ts` (לא `"use server"`); UI ב-`login/SmsLoginForm.tsx`.
 - קודים: `randomInt`, נשמר רק HMAC-SHA256 עם `SESSION_SECRET` בטבלה `login_codes`, חד-פעמי, תוקף `LOGIN_CODE_TTL_MINUTES` (10), `LOGIN_CODE_MAX_ATTEMPTS` (5) ואז נעילה, קוד חדש מבטל ישנים. ה-SMS מציב את **הקוד בתחילת ההודעה** כדי שיופיע בבאנר ההתראה.
 - מספר חדש עובר לשלב שם עם **הוכחה חתומה** (JWT 10 דק') — העובדה "המספר הזה הוא/לא לקוח" לא נחשפת לפני שהוכח שהמספר שלו. נוצר `User` עם סיסמה אקראית לא-שמישה (כמו לקוחות IVR) + התראת "לקוח חדש" לספר.
