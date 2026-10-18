@@ -62,6 +62,9 @@ export function TimeInput({
       dir="ltr"
       placeholder="HH:MM"
       maxLength={5}
+      // Without an explicit size an <input> has a ~20-character minimum width, which made two side-by-side
+      // time fields wider than a phone screen and pushed the whole admin page into horizontal scroll.
+      size={5}
       pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
       title="שעה בפורמט 09:30"
       aria-label={ariaLabel}
@@ -69,7 +72,7 @@ export function TimeInput({
       required={required}
       onChange={(e) => handle(e.target.value)}
       onBlur={blur}
-      className={`${className ?? ""} text-center`}
+      className={`${className ?? ""} min-w-0 text-center`}
     />
   );
 }
