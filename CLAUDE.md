@@ -155,7 +155,7 @@ Worker Container — תזכורות לפני תור ותזכורת תשלום (i
 - אין ישות `Child` — פרטי הילד ברמת התור (`attendee_name`, `attendee_type`).
 - **שלוש פעולות נפרדות על תור/יום — אל תתבלבלו:**
   1. **ביטול תור בודד** (`cancelAppointmentAction`) — soft: `status = cancelled`, הרשומה נשארת.
-  2. **מחיקת יום / מחיקת היסטוריה** (`deleteWorkDayAction`/`deleteHistoryAction`) — hard delete אמיתי (cascade), לא ארכיון. (`deleteAllWorkDaysAction` הוסרה 2026-10-07.)
+  2. **מחיקת היסטוריה** (`deleteHistoryAction`) — hard delete אמיתי (cascade), לא ארכיון. (`deleteAllWorkDaysAction` הוסרה 2026-10-07; כפתור ו-`deleteWorkDayAction` ("מחיקת היום כולו") הוסרו 2026-10-18 לבקשת המשתמשת.)
   3. **חסימת יום** (`WorkDay.is_blocked`, `setWorkDayBlockedAction`) — לא מוחקת ולא מבטלת; חוסמת רק קביעה/שינוי **חדשים של לקוחות**; הפיכה (טוגל). שונה גם מ-`BlockedTime` (טווח שעות בתוך יום).
 - לכל תור: בקשת ביטול (`CancellationRequest`) אחת לכל היותר — `appointment_id @unique`, לכן בקשה שנדחתה חוזרת ל-`pending` בבקשה נוספת במקום שורה חדשה; ובקשת תור (`BookingRequest`) אחת לכל היותר.
 - `BookingRequest` אינה "כוונה": ה-`Appointment` נוצר מיד כ-`scheduled` ותופס את השעה; דחייה → `cancelled` ושחרור השעה; אישור לא נוגע בתור. אין `booking_request_id` ב-`Notification` — `booking_decision` מצביעה על `appointment_id`.
@@ -237,7 +237,7 @@ Worker Container — תזכורות לפני תור ותזכורת תשלום (i
 - פתיחת יום (תאריך, שעות, הפסקות דינמיות); **עדכון שעות והפסקות** של יום פתוח (2026-10-18: אותו טופס מוסיף/מסיר/עורך הפסקות, ההפסקות מוחלפות יחד עם השעות בטרנזקציה; נחסם אם יש תור/חסימה מחוץ לטווח החדש או הפסקה שחופפת לתור קבוע). **עבודה אחרי חצות (2026-10-18):** שעת סיום/הפסקה מוקדמת משעת ההתחלה נחשבת ליום הקלנדרי הבא, עד **03:00** לכל היותר (`lib/workDayTimes.ts`, `workDayTimeToUtc`); צפייה בתורי יום (`/admin/day/[id]`).
 - **העברת תור** (`MoveAppointmentButton`) לשעה אחרת באותו יום — `Notification`+Push (בלי SMS) ללקוח עם חשבון (תור ידני ללא חשבון מועבר בלי הודעה).
 - **ביטול תור בודד** (`CancelAppointmentButton`, US-017) — שולח `Notification`+Push ללקוח מקושר, ומפעיל התראת רשימת המתנה אם השעה עתידית.
-- **מחיקת יום/כל היומן** (US-012) — עם עותק הדפסה/PDF אופציונלי לפני (`/admin/day/[id]/print`, `/admin/print-all`) והודעת ביטול לכל לקוח עם תור פעיל עתידי בטווח.
+- **מחיקת יום/כל היומן** (US-012) — ⚠️ מחיקת יום בודד הוסרה מהממשק 2026-10-18; עם עותק הדפסה/PDF אופציונלי לפני (`/admin/day/[id]/print`, `/admin/print-all`) והודעת ביטול לכל לקוח עם תור פעיל עתידי בטווח.
 - **חסימת יום** (`BlockDayToggle`, שתי גרסאות — מלאה עם הסבר ב-`/admin/day/[id]`, `compact` מתחת ל"ניהול היום" בכל שורה ברשימה; שתיהן קוראות ל-`setWorkDayBlockedAction`) + badge "חסום".
 - עמודי הדפסה/ייצוא נשארים `bg-white`/`text-gray-*` פשוטים בכוונה (עיצוב להדפסה, לא ממותג).
 

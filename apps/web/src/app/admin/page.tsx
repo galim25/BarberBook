@@ -14,6 +14,7 @@ import { OpenWorkDayForm } from "./OpenWorkDayForm";
 import { QuickDayAppointments } from "./QuickDayAppointments";
 import { BlockDayToggle } from "./day/[id]/BlockDayToggle";
 import { BsdBar } from "@/components/BsdBar";
+import { AdminBrandHero } from "@/components/AdminBrandHero";
 import { BellIcon, CalendarPlusIcon, HourglassIcon, SwapIcon, XCircleIcon } from "@/components/AdminIcons";
 import { AdminMenu } from "@/components/AdminMenu";
 import { DeleteHistoryMenuItem } from "./DeleteHistoryMenuItem";
@@ -78,41 +79,32 @@ export default async function AdminPage({
   return (
     <main dir="rtl" className="bg-cream mx-auto flex min-h-screen w-full max-w-md flex-col gap-4 p-6 md:max-w-2xl">
       <BsdBar />
-      <header className="from-barber-teal/30 to-cream -mx-6 bg-gradient-to-b px-6 pt-3 pb-2">
-        <div className="flex items-center justify-between gap-2">
-          <AdminMenu
-            items={[
-              { href: "/admin/contacts", label: "אנשי קשר" },
-              { href: "/admin/blocked-customers", label: "לקוחות חסומים" },
-              { href: "/admin/waitlist-settings", label: "ניהול רשימת המתנה" },
-              { href: "/admin/announcements", label: "הודעות כלליות" },
-              { href: "/admin/print-all", label: "היסטוריה וגיבוי" },
-              { href: "/admin/settings", label: "הגדרות" },
-              { href: "/admin/barbers", label: "ניהול ספרים" },
-            ]}
-            footer={<DeleteHistoryMenuItem />}
-          />
-          <div className="flex min-w-0 flex-1 justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo-cropped.png"
-              alt="Yossi Barber"
-              width={3045}
-              height={863}
-              style={{ height: "auto", width: "auto", maxHeight: 48, maxWidth: "100%" }}
-            />
-          </div>
-          <Link
-            href="/admin/notifications"
-            aria-label={unreadNotifications ? `התראות (${unreadNotifications} חדשות)` : "התראות"}
-            className="border-barber-teal text-barber-teal relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border bg-white"
-          >
-            <BellIcon size={22} />
-            {!!unreadNotifications && <CountBadge count={unreadNotifications} className="absolute -top-1.5 -left-1.5" />}
-          </Link>
-        </div>
-        <h1 className="text-barber-teal mt-2 text-center text-2xl font-bold">היי {session.full_name}</h1>
-      </header>
+      <div className="relative">
+        <AdminBrandHero />
+        <Link
+          href="/admin/notifications"
+          aria-label={unreadNotifications ? `התראות (${unreadNotifications} חדשות)` : "התראות"}
+          className="border-barber-teal text-barber-teal absolute top-3 left-0 flex h-11 w-11 items-center justify-center rounded-full border bg-white"
+        >
+          <BellIcon size={22} />
+          {!!unreadNotifications && <CountBadge count={unreadNotifications} className="absolute -top-1.5 -left-1.5" />}
+        </Link>
+      </div>
+      <h1 className="text-barber-teal text-center text-3xl font-bold">היי {session.full_name}</h1>
+      <div className="flex justify-start">
+        <AdminMenu
+          items={[
+            { href: "/admin/contacts", label: "אנשי קשר" },
+            { href: "/admin/blocked-customers", label: "לקוחות חסומים" },
+            { href: "/admin/waitlist-settings", label: "ניהול רשימת המתנה" },
+            { href: "/admin/announcements", label: "הודעות כלליות" },
+            { href: "/admin/print-all", label: "היסטוריה וגיבוי" },
+            { href: "/admin/settings", label: "הגדרות" },
+            { href: "/admin/barbers", label: "ניהול ספרים" },
+          ]}
+          footer={<DeleteHistoryMenuItem />}
+        />
+      </div>
 
       {barbers.length > 1 && (
         <div className="flex flex-wrap justify-start gap-2">

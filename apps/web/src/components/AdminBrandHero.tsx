@@ -18,7 +18,13 @@ export function AdminBrandHero() {
   return (
     <div className="from-barber-teal/50 -mx-6 flex flex-col items-center bg-gradient-to-b to-cream px-6 pt-10 pb-10">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo-cropped.png" alt="Yossi Barber" height={90} style={{ height: 90, width: "auto" }} />
+      <img
+        src="/logo-cropped.png"
+        alt="Yossi Barber"
+        width={3045}
+        height={863}
+        style={{ height: "auto", width: "auto", maxHeight: 90, maxWidth: "100%" }}
+      />
     </div>
   );
 }

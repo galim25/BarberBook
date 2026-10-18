@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { prisma, Prisma } from "@barberbook/db";
 import { getSession } from "@/lib/auth/session";
-import { notifyAppointmentCancelled } from "@/lib/notifyCustomer";
 import { notifyWaitlistOfExtendedHours, notifyWaitlistOfNewWorkDay } from "@/lib/actions/waitlist";
 import { getContactNameMap } from "@/lib/contactNames";
 import { END_BEFORE_START_ERROR, workDayTimeToUtc } from "@/lib/workDayTimes";
@@ -264,55 +263,6 @@ export async function createWorkDayAction(input: CreateWorkDayInput): Promise<Cr
   }
 
   await notifyWaitlistOfNewWorkDay(new Date(`${input.work_date}T00:00:00Z`));
-
-  revalidatePath("/admin");
-  return { success: true };
-}
-
-/**
- * Hard delete (FR-15/US-012) — distinct from cancelAppointmentAction's soft
- * cancel. Cascades via the schema's onDelete: Cascade to remove breaks,
- * blocked times, appointments, and anything tied to those appointments.
- * When notifyCustomers is true, any customer with a still-upcoming
- * scheduled appointment on this day gets the same cancellation
- * SMS/Notification as a single cancel, sent before the delete since the
- * appointment row (and thus any FK to it) won't survive. Appointments
- * already in the past never notify regardless — the schema has no separate
- * "completed" status, so a historical day's appointments are still
- * status="scheduled" and would otherwise get a bogus "your appointment was
- * cancelled" text for a haircut that already happened.
- */
-export async function deleteWorkDayAction(
-  work_day_id: string,
-  notifyCustomers: boolean,
-): Promise<CreateWorkDayResult> {
-  if (!(await requireAdminSession())) return { error: "אין הרשאה" };
-
-  const workDay = await prisma.workDay.findUnique({
-    where: { id: work_day_id },
-    include: {
-      appointments: {
-        where: { status: "scheduled", starts_at: { gte: new Date() } },
-        include: { service: true, booked_by: true },
-      },
-    },
-  });
-  if (!workDay) return { error: "יום העבודה לא נמצא" };
-
-  if (notifyCustomers) {
-    for (const a of workDay.appointments) {
-      if (a.booked_by) {
-        await notifyAppointmentCancelled({
-          user_id: a.booked_by.id,
-          phone_number: a.booked_by.phone_number,
-          service_name: a.service.name,
-          starts_at: a.starts_at,
-        });
-      }
-    }
-  }
-
-  await prisma.workDay.delete({ where: { id: work_day_id } });
 
   revalidatePath("/admin");
   return { success: true };

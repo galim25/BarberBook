@@ -7,7 +7,6 @@ import { getAppointmentsForWorkDay } from "@/lib/actions/adminAppointments";
 import { buildDayTimeline, splitFreeSegments } from "@/lib/dayTimeline";
 import { EditHoursForm } from "./EditHoursForm";
 import { CreateManualAppointmentForm } from "./CreateManualAppointmentForm";
-import { DeleteWorkDayButton } from "./DeleteWorkDayButton";
 import { BlockDayToggle } from "./BlockDayToggle";
 import { PageHeader } from "@/components/PageHeader";
 import { AdminBrandHero } from "@/components/AdminBrandHero";
@@ -63,7 +62,6 @@ export default async function AdminDayPage({ params }: { params: Promise<{ id: s
         <Link href={`/admin/day/${workDay.id}/print`} className="text-barber-teal text-sm underline">
           הדפסה / שמירה כ-PDF
         </Link>
-        <DeleteWorkDayButton workDayId={workDay.id} />
       </div>
 
       <BlockDayToggle workDayId={workDay.id} initialValue={workDay.is_blocked} />
