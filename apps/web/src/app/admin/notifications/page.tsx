@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ISRAEL_TIME_ZONE } from "@barberbook/shared";
 import { requireAdmin } from "@/lib/auth/session";
 import { getAdminNotifications } from "@/lib/actions/adminNotifications";
-import { MarkReadButton } from "./MarkReadButton";
+import { ClearNotificationsButton } from "./ClearNotificationsButton";
 import { PageHeader } from "@/components/PageHeader";
 import { AdminBrandHero } from "@/components/AdminBrandHero";
 import { PushNotificationToggle } from "@/components/PushNotificationToggle";
@@ -20,7 +20,7 @@ function formatDateTime(d: Date) {
 export default async function AdminNotificationsPage() {
   await requireAdmin();
   const notifications = await getAdminNotifications();
-  const hasUnread = notifications.some((n) => !n.read_at);
+  const hasAny = notifications.length > 0;
 
   return (
     <main dir="rtl" className="bg-cream mx-auto flex min-h-screen max-w-md flex-col gap-4 p-6">
@@ -29,7 +29,7 @@ export default async function AdminNotificationsPage() {
         <Link href="/admin" className="text-barber-teal text-sm underline">
           חזרה לניהול
         </Link>
-        <MarkReadButton hasUnread={hasUnread} />
+        <ClearNotificationsButton hasAny={hasAny} />
       </div>
 
       <PushNotificationToggle audience="admin" />

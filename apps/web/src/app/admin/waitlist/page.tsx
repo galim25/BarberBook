@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ISRAEL_TIME_ZONE } from "@barberbook/shared";
 import { requireAdmin } from "@/lib/auth/session";
 import { getDateWaitlistEntriesAdmin, getWaitlistEntries } from "@/lib/actions/waitlist";
+import { getUnreadWaitlistJoinCount } from "@/lib/actions/adminNotifications";
+import { MarkWaitlistSeen } from "./MarkWaitlistSeen";
 import { RemoveWaitlistEntryButton } from "./RemoveWaitlistEntryButton";
 import { CustomerContact } from "@/components/CustomerContact";
 import { PageHeader } from "@/components/PageHeader";
@@ -20,6 +22,7 @@ export default async function WaitlistPage() {
   await requireAdmin();
   const entries = await getWaitlistEntries();
   const dateEntries = await getDateWaitlistEntriesAdmin();
+  const unreadJoins = await getUnreadWaitlistJoinCount();
   const byDay = new Map<string, typeof dateEntries>();
   for (const e of dateEntries) {
     const key = `${e.work_date}|${e.barber_name}`;
@@ -28,6 +31,7 @@ export default async function WaitlistPage() {
 
   return (
     <main dir="rtl" className="bg-cream mx-auto flex min-h-screen max-w-md flex-col gap-4 p-6">
+      <MarkWaitlistSeen unread={unreadJoins} />
       <PageHeader title="רשימת המתנה" topBanner={<AdminBrandHero />} />
       <div className="flex justify-end">
         <Link href="/admin" className="text-barber-teal text-sm underline">

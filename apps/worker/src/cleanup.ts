@@ -27,7 +27,8 @@ const ADMIN_SCREEN_NOTIFICATION_TYPES = [
  * Nightly at 00:00 Israel time:
  *  1. Clears the barber's notifications that are no longer relevant — those about an appointment whose
  *     time has already passed, whatever its status (even an unhandled request), plus "new customer" and
- *     "joined the waitlist" notifications from before midnight. Customers' own notifications are never touched.
+ *     already-read "joined the waitlist" notifications from before midnight (unread ones are kept).
+ *     Customers' own notifications are never touched.
  *  2. Deletes past appointments the barber approved (BookingRequest approved). Appointments in any other
  *     state (never needed approval, pending, rejected, cancelled) are kept.
  * Idempotent, so a night the worker was down is caught up by the next run.
@@ -48,7 +49,12 @@ export async function purgeFinishedDay(): Promise<void> {
       },
     }),
     prisma.notification.deleteMany({
-      where: { ...admins, type: { in: ["customer_registered", "waitlist_joined"] }, created_at: { lt: midnight } },
+      where: {
+        ...admins,
+        created_at: { lt: midnight },
+        // An unread "joined the waitlist" stays until the barber has seen it (it drives the badge on /admin).
+        OR: [{ type: "customer_registered" }, { type: "waitlist_joined", read_at: { not: null } }],
+      },
     }),
     prisma.appointment.deleteMany({
       where: { ends_at: { lt: now }, booking_request: { is: { status: "approved" } } },

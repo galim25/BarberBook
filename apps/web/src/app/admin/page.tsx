@@ -6,7 +6,7 @@ import { getWorkDaysAdmin, getWorkDayDetail } from "@/lib/actions/workdays";
 import { getBarbersAdmin } from "@/lib/actions/barbers";
 import { getAppointmentsForWorkDay } from "@/lib/actions/adminAppointments";
 import { getPendingCancellationCount } from "@/lib/actions/cancellationRequests";
-import { getUnreadAdminNotificationCount } from "@/lib/actions/adminNotifications";
+import { getUnreadAdminNotificationCount, getUnreadWaitlistJoinCount } from "@/lib/actions/adminNotifications";
 import { getPendingRescheduleCount } from "@/lib/actions/rescheduleRequests";
 import { getPendingBookingRequestCount } from "@/lib/actions/bookingRequests";
 import { buildDayTimeline } from "@/lib/dayTimeline";
@@ -63,6 +63,7 @@ export default async function AdminPage({
   const unreadNotifications = await getUnreadAdminNotificationCount();
   const pendingBookingRequests = await getPendingBookingRequestCount();
   const pendingReschedules = await getPendingRescheduleCount();
+  const unreadWaitlistJoins = await getUnreadWaitlistJoinCount();
 
   const nearestWorkDay = workDays[0];
   const nearestWorkDayDetail = nearestWorkDay ? await getWorkDayDetail(nearestWorkDay.id) : null;
@@ -153,10 +154,12 @@ export default async function AdminPage({
         </div>
         <Link
           href="/admin/waitlist"
-          className="bg-barber-teal text-cream-text flex min-h-12 items-center justify-center gap-2 rounded-full px-4 font-bold"
+          aria-label={unreadWaitlistJoins ? `רשימת המתנה (${unreadWaitlistJoins} חדשים)` : "רשימת המתנה"}
+          className="bg-barber-teal text-cream-text relative flex min-h-12 items-center justify-center gap-2 rounded-full px-4 font-bold"
         >
           <HourglassIcon size={20} />
           רשימת המתנה
+          {!!unreadWaitlistJoins && <CountBadge count={unreadWaitlistJoins} inverted className="absolute top-1/2 left-3 -translate-y-1/2" />}
         </Link>
       </section>
 

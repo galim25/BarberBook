@@ -52,12 +52,32 @@ export async function getUnreadAdminNotificationCount(): Promise<number> {
   });
 }
 
-export async function markAdminNotificationsReadAction(): Promise<void> {
+/** New waitlist sign-ups the barber has not seen yet: the badge on the "רשימת המתנה" button on /admin. */
+export async function getUnreadWaitlistJoinCount(): Promise<number> {
+  const session = await requireAdminSession();
+  if (!session) return 0;
+  return prisma.notification.count({
+    where: { user_id: session.sub, type: "waitlist_joined", read_at: null },
+  });
+}
+
+/** Called when the barber opens /admin/waitlist: those sign-ups are now seen (also lowers the bell badge). */
+export async function markWaitlistJoinsReadAction(): Promise<void> {
   const session = await requireAdminSession();
   if (!session) return;
   await prisma.notification.updateMany({
-    where: { user_id: session.sub, type: { in: [...ADMIN_NOTIFICATION_TYPES] }, read_at: null },
+    where: { user_id: session.sub, type: "waitlist_joined", read_at: null },
     data: { read_at: new Date() },
+  });
+  revalidatePath("/admin");
+}
+
+/** "Clear all" on the notifications screen: deletes the barber's notifications for good (read and unread). */
+export async function deleteAdminNotificationsAction(): Promise<void> {
+  const session = await requireAdminSession();
+  if (!session) return;
+  await prisma.notification.deleteMany({
+    where: { user_id: session.sub, type: { in: [...ADMIN_NOTIFICATION_TYPES] } },
   });
   revalidatePath("/admin");
   revalidatePath("/admin/notifications");
