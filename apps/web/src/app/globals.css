@@ -12,3 +12,17 @@
   --color-slate-muted: #7c7c7c;
   --color-cream-text: #fffcf7;
 }
+
+/* Layout guard (2026-10-18): one element wider than the screen must never rescale the whole page.
+   <body> is a flex column, so <main> (a flex item) used to grow to its widest child's minimum width — two
+   unsized time inputs side by side made /admin 448px wide on a 393px phone, and the browser shrank the text
+   and added sideways scrolling. `min-width: 0` lets <main> shrink to the screen; `overflow-x: clip` (unlike
+   `hidden`, it creates no scroll container, so `position: sticky` keeps working) cuts off anything left over. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+main {
+  min-width: 0;
+}

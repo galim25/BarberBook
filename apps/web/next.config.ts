@@ -9,6 +9,10 @@ const devAllowedOrigins = process.env.DEV_ALLOWED_ORIGIN?.split(",").map((o) => 
 
 const nextConfig: NextConfig = {
   ...(devAllowedOrigins ? { allowedDevOrigins: devAllowedOrigins } : {}),
+  async headers() {
+    // The browser must always be able to see a new service worker right after a deploy.
+    return [{ source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }] }];
+  },
 };
 
 // Generates public/sw.js from src/app/sw.ts at build time and injects the

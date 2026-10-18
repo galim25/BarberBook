@@ -38,6 +38,7 @@
 | `scripts/deploy.sh` | סקריפט עדכון קוד בפרודקשן: pull → build → החלפת קונטיינרים → migrate → הפעלה מחדש של nginx → בדיקת תקינות |
 | `security/*.md`, `privacy/*.md` | ממצאי ביקורת אבטחה (תשתית/תוכנה/סוכן) ותיקון 13 לחוק הגנת הפרטיות |
 | `.claude/skills/barberbook-design/SKILL.md` | כללי עיצוב — לטעון לפני כל שינוי UI |
+| `.claude/skills/barberbook-workflow/SKILL.md` | שיטת העבודה: בנייה ← בדיקות ← build ← restart ב-pm2 (פורט 39000) ← עצירה לבדיקה ואישור ← commit + push |
 
 ---
 
@@ -134,6 +135,8 @@ Worker Container — תזכורות לפני תור ותזכורת תשלום (i
 - `public/site.webmanifest`: ערכי מותג (`theme_color #508186`, `background_color #fdf8f0`, אייקונים 192/512 `any maskable`).
 - `<InstallPrompt/>` — תופס `beforeinstallprompt` ומציג באנר התקנה; ב-iOS (אין `beforeinstallprompt`) מציג הנחיית "שיתוף ← הוסף למסך הבית" מותאמת לדפדפן (ספארי: כפתור בסרגל; כרום/Edge/פיירפוקס ל-iOS: בשורת הכתובת). זיהוי iOS משותף ב-`apps/web/src/lib/ios.ts`, כולל iPadOS 13+ שמזדהה כ-Mac (`maxTouchPoints > 1`) — לא לזהות iOS לפי user agent בלבד במקום אחר. דחייה נשמרת ב-`localStorage`.
 - `color-scheme` מוגדר light-only כדי למנוע היפוך אוטומטי של Android לכהה.
+- **עדכון גרסה אצל משתמשים פתוחים (2026-10-18):** אפליקציה מותקנת יכולה להישאר בזיכרון ימים; אחרי deploy דף ישן קורא ל-Server Actions שה-id שלהם כבר לא קיים ומסכים נכשלים עד רענון. לכן `components/AppUpdater.tsx` (ב-`layout.tsx`) מקבל את `getBuildId()` (`.next/BUILD_ID`, `lib/buildId.ts`) של הבנייה שהרנדרה את הדף ומשווה ל-`GET /api/version` (הבנייה שרצה עכשיו): בדיקה בטעינה, בחזרה לחזית/פוקוס/חזרת רשת וכל 5 דקות; חזרה לחזית על גרסה ישנה → רענון אוטומטי, גרסה חדשה שנמצאה בזמן שימוש → באנר "יצאה גרסה חדשה — רענון"; כשל `Server Action` מפעיל בדיקה; לכל היותר רענון אוטומטי אחד לדקה (מניעת לולאה). `/sw.js` מוגש עם `Cache-Control: no-store`. **אין צורך להסיר/להתקין מחדש.**
+- **הגנת פריסה מול גלישה אופקית (2026-10-18):** `body` הוא flex-column ו-`main` פריט flex, ולכן אלמנט אחד רחב מדי (תיבות שעה בלי `size` — תקלה אמיתית) הרחיב את כל הדף והדפדפן הקטין את הכתב והוסיף גלילה צדדית. `globals.css`: `main { min-width: 0 }` ו-`html, body { overflow-x: clip }` (לא `hidden` — לא שובר `position: sticky`). בנוסף `pnpm --filter @barberbook/web check:overflow` (`apps/web/scripts/check-overflow.mts`) פותח את מסכי הלקוח והמנהל ב-4 רוחבי טלפון ונכשל אם אלמנט חורג מהמסך — **להריץ לפני כל פריסה שנוגעת ב-UI** (דורש build רץ, `.env` של apps/web ו-Chromium של Playwright; לא קורא ל-DB לכתיבה).
 
 ### משתני סביבה עיקריים
 ראו `.env.example` (לעולם לא לקרוא `.env` — סעיף 12): `DATABASE_URL`, `SESSION_SECRET`, `COOKIE_SECURE`, `CUSTOMER_LOGIN_MODE`, `SMS_PROVIDER` (+ פרטי 019sms), `YEMOT_PHONE_NUMBER`/`YEMOT_WEBHOOK_SECRET`/`PUBLIC_BASE_URL`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`, `FIGMA_ACCESS_TOKEN`.

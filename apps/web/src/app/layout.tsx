@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Rubik } from "next/font/google";
 import { SerwistProvider } from "@serwist/next/react";
+import { AppUpdater } from "@/components/AppUpdater";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { getBuildId } from "@/lib/buildId";
 import "./globals.css";
 
 const rubik = Rubik({ subsets: ["hebrew", "latin"], weight: ["400", "500", "700"] });
@@ -41,6 +43,7 @@ export default function RootLayout({
         <SerwistProvider swUrl="/sw.js" disable={process.env.NODE_ENV !== "production"}>
           {children}
           <InstallPrompt />
+          <AppUpdater buildId={getBuildId()} />
         </SerwistProvider>
       </body>
     </html>
