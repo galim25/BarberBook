@@ -72,6 +72,9 @@ export default async function AdminDayPage({ params }: { params: Promise<{ id: s
         workDayId={workDay.id}
         initialStartsAt={formatHHMM(workDay.starts_at)}
         initialEndsAt={formatHHMM(workDay.ends_at)}
+        initialBreaks={[...workDay.breaks]
+          .sort((a, b) => a.starts_at.getTime() - b.starts_at.getTime())
+          .map((b) => ({ starts_at: formatHHMM(b.starts_at), ends_at: formatHHMM(b.ends_at) }))}
       />
 
       <CreateManualAppointmentForm workDayId={workDay.id} />

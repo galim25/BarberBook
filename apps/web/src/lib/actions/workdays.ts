@@ -2,11 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma, Prisma } from "@barberbook/db";
-import { ISRAEL_TIME_ZONE, zonedTimeToUtc } from "@barberbook/shared";
 import { getSession } from "@/lib/auth/session";
 import { notifyAppointmentCancelled } from "@/lib/notifyCustomer";
 import { notifyWaitlistOfExtendedHours, notifyWaitlistOfNewWorkDay } from "@/lib/actions/waitlist";
 import { getContactNameMap } from "@/lib/contactNames";
+import { END_BEFORE_START_ERROR, workDayTimeToUtc } from "@/lib/workDayTimes";
 
 export type WorkDayBreak = { id: string; starts_at: Date; ends_at: Date };
 export type WorkDayWithBreaks = {
@@ -28,6 +28,40 @@ type CreateWorkDayInput = {
   breaks: BreakInput[];
 };
 export type CreateWorkDayResult = { error?: string; success?: boolean };
+
+/** Resolves + validates a day's hours and breaks ("HH:mm", after-midnight times roll to the next date). */
+function resolveHoursAndBreaks(
+  work_date: string,
+  startTime: string,
+  endTime: string,
+  breakInputs: BreakInput[],
+): { error: string } | { starts_at: Date; ends_at: Date; breaks: { starts_at: Date; ends_at: Date }[] } {
+  const starts_at = workDayTimeToUtc(work_date, startTime, "00:00");
+  const ends_at = workDayTimeToUtc(work_date, endTime, startTime);
+  if (!starts_at || !ends_at || starts_at >= ends_at) {
+    return { error: END_BEFORE_START_ERROR };
+  }
+
+  const breaks: { starts_at: Date; ends_at: Date }[] = [];
+  for (const b of breakInputs) {
+    const bStart = workDayTimeToUtc(work_date, b.starts_at, startTime);
+    const bEnd = workDayTimeToUtc(work_date, b.ends_at, startTime);
+    if (!bStart || !bEnd || bStart >= bEnd) {
+      return { error: "בהפסקה שעת הסיום חייבת להיות אחרי שעת ההתחלה" };
+    }
+    if (bStart < starts_at || bEnd > ends_at) {
+      return { error: "כל הפסקה חייבת להיות בתוך שעות העבודה של היום" };
+    }
+    breaks.push({ starts_at: bStart, ends_at: bEnd });
+  }
+  breaks.sort((a, b) => a.starts_at.getTime() - b.starts_at.getTime());
+  for (let i = 1; i < breaks.length; i++) {
+    if (breaks[i].starts_at < breaks[i - 1].ends_at) {
+      return { error: "ההפסקות חופפות זו לזו" };
+    }
+  }
+  return { starts_at, ends_at, breaks };
+}
 
 async function requireAdminSession() {
   const session = await getSession();
@@ -67,6 +101,7 @@ type UpdateWorkDayHoursInput = {
   work_day_id: string;
   starts_at: string; // "HH:mm"
   ends_at: string; // "HH:mm"
+  breaks: BreakInput[];
 };
 
 export async function updateWorkDayHoursAction(
@@ -85,25 +120,35 @@ export async function updateWorkDayHoursAction(
   if (!workDay) return { error: "יום העבודה לא נמצא" };
 
   const work_date = workDay.work_date.toISOString().slice(0, 10);
-  const starts_at = zonedTimeToUtc(work_date, input.starts_at, ISRAEL_TIME_ZONE);
-  const ends_at = zonedTimeToUtc(work_date, input.ends_at, ISRAEL_TIME_ZONE);
-  if (starts_at >= ends_at) {
-    return { error: "שעת הסיום חייבת להיות אחרי שעת ההתחלה" };
-  }
+  const resolved = resolveHoursAndBreaks(work_date, input.starts_at, input.ends_at, input.breaks);
+  if ("error" in resolved) return resolved;
+  const { starts_at, ends_at, breaks } = resolved;
 
-  const outOfRange = [...workDay.breaks, ...workDay.blocked_times, ...workDay.appointments].some(
+  const outOfRange = [...workDay.blocked_times, ...workDay.appointments].some(
     (item) => item.starts_at < starts_at || item.ends_at > ends_at,
   );
   if (outOfRange) {
-    return { error: "יש תורים, הפסקות או חסימות מחוץ לטווח השעות החדש — יש להזיז אותם קודם" };
+    return { error: "יש תורים או חסימות מחוץ לטווח השעות החדש — יש להזיז אותם קודם" };
+  }
+  const breakHitsAppointment = breaks.some((b) =>
+    workDay.appointments.some((a) => a.starts_at < b.ends_at && a.ends_at > b.starts_at),
+  );
+  if (breakHitsAppointment) {
+    return { error: "יש תור קבוע בזמן ההפסקה — יש להזיז אותו קודם" };
   }
 
   const extended = starts_at < workDay.starts_at || ends_at > workDay.ends_at;
 
-  await prisma.workDay.update({
-    where: { id: input.work_day_id },
-    data: { starts_at, ends_at },
-  });
+  await prisma.$transaction([
+    prisma.workDay.update({
+      where: { id: input.work_day_id },
+      data: { starts_at, ends_at },
+    }),
+    prisma.workBreak.deleteMany({ where: { work_day_id: input.work_day_id } }),
+    prisma.workBreak.createMany({
+      data: breaks.map((b) => ({ work_day_id: input.work_day_id, ...b })),
+    }),
+  ]);
 
   if (extended) {
     await notifyWaitlistOfExtendedHours(workDay.work_date);
@@ -197,30 +242,9 @@ export async function getAllWorkDaysExport(): Promise<ExportWorkDay[]> {
 export async function createWorkDayAction(input: CreateWorkDayInput): Promise<CreateWorkDayResult> {
   if (!(await requireAdminSession())) return { error: "אין הרשאה" };
 
-  const starts_at = zonedTimeToUtc(input.work_date, input.starts_at, ISRAEL_TIME_ZONE);
-  const ends_at = zonedTimeToUtc(input.work_date, input.ends_at, ISRAEL_TIME_ZONE);
-  if (starts_at >= ends_at) {
-    return { error: "שעת הסיום חייבת להיות אחרי שעת ההתחלה" };
-  }
-
-  const breaks = input.breaks.map((b) => ({
-    starts_at: zonedTimeToUtc(input.work_date, b.starts_at, ISRAEL_TIME_ZONE),
-    ends_at: zonedTimeToUtc(input.work_date, b.ends_at, ISRAEL_TIME_ZONE),
-  }));
-  for (const b of breaks) {
-    if (b.starts_at >= b.ends_at) {
-      return { error: "בהפסקה שעת הסיום חייבת להיות אחרי שעת ההתחלה" };
-    }
-    if (b.starts_at < starts_at || b.ends_at > ends_at) {
-      return { error: "כל הפסקה חייבת להיות בתוך שעות העבודה של היום" };
-    }
-  }
-  const sortedBreaks = [...breaks].sort((a, b) => a.starts_at.getTime() - b.starts_at.getTime());
-  for (let i = 1; i < sortedBreaks.length; i++) {
-    if (sortedBreaks[i].starts_at < sortedBreaks[i - 1].ends_at) {
-      return { error: "ההפסקות חופפות זו לזו" };
-    }
-  }
+  const resolved = resolveHoursAndBreaks(input.work_date, input.starts_at, input.ends_at, input.breaks);
+  if ("error" in resolved) return resolved;
+  const { starts_at, ends_at, breaks } = resolved;
 
   try {
     await prisma.workDay.create({

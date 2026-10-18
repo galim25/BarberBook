@@ -231,18 +231,18 @@ export function OpenWorkDayForm({
             <TimeInput
               value={b.starts_at}
               onChange={(v) => updateBreak(i, "starts_at", v)}
-              className={inputClass}
+              className={`${inputClass} w-0 min-w-0 flex-1`}
             />
             <span className="text-slate-muted">—</span>
             <TimeInput
               value={b.ends_at}
               onChange={(v) => updateBreak(i, "ends_at", v)}
-              className={inputClass}
+              className={`${inputClass} w-0 min-w-0 flex-1`}
             />
             <button
               type="button"
               onClick={() => removeBreak(i)}
-              className="text-sm text-red-600 underline"
+              className="shrink-0 text-sm text-red-600 underline"
             >
               הסרה
             </button>
