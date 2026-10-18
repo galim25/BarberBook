@@ -25,11 +25,13 @@ export default async function AppointmentsPage() {
   if (!session) return null;
 
   const requiresApproval = await getRequiresApproval();
+  const now = new Date();
 
   const appointments = await prisma.appointment.findMany({
     where: {
       booked_by_user_id: session.sub,
-      starts_at: { gte: new Date() },
+      // Stays listed until it ends (an appointment in progress is still shown), not just until it starts.
+      ends_at: { gte: now },
       // Upcoming appointments, plus ones the barber rejected so the customer sees the outcome.
       OR: [{ status: "scheduled" }, { status: "cancelled", booking_request: { status: "rejected" } }],
     },
@@ -82,6 +84,8 @@ export default async function AppointmentsPage() {
             )}
             {a.status === "cancelled" ? null : a.cancellation_request?.status === "pending" ? (
               <p className="text-slate-muted mt-2 text-sm">בקשת ביטול נשלחה — ממתינה לאישור הספר</p>
+            ) : a.starts_at <= now ? (
+              <p className="text-slate-muted mt-2 text-sm">התור מתקיים כעת</p>
             ) : a.reschedule_request?.status === "pending" ? (
               <div className="mt-2 flex flex-col gap-2">
                 <p className="text-slate-muted text-sm">

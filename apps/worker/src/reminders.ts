@@ -68,7 +68,7 @@ export async function sendDueReminders(): Promise<void> {
 const PAYMENT_REMINDER_MAX_AGE_MINUTES = 6 * 60;
 
 /**
- * Half an hour after an appointment starts, reminds the customer to pay the barber. Same
+ * Half an hour after an appointment starts, reminds the customer to pay the barber (in-app notification + push only, deliberately no SMS). Same
  * idempotency scheme as sendDueReminders: a payment_reminder Notification row marks it sent.
  * Appointments still awaiting the barber's approval are skipped (they may never happen).
  */
@@ -92,7 +92,6 @@ export async function sendDuePaymentReminders(): Promise<void> {
     if (!appointment.booked_by) continue;
     try {
       const message = "זוהי תזכורת מהספר לגבי תשלום על התספורת. אם שילמת, ראה הודעה זו כמבוטלת.";
-      await getSmsProvider().send(appointment.booked_by.phone_number, message);
       await prisma.notification.create({
         data: {
           user_id: appointment.booked_by.id,
