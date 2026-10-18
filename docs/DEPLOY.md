@@ -225,8 +225,9 @@ bash /root/barberbook/scripts/deploy.sh
   bash /root/barberbook/scripts/deploy.sh
   ```
 
-  הסקריפט מבצע pull → build → החלפת קונטיינרים → migrate → בדיקת תקינות, ועוצר בשגיאה
+  הסקריפט מבצע pull → build → החלפת קונטיינרים → migrate → הפעלה מחדש של nginx → בדיקת תקינות, ועוצר בשגיאה
   ברורה בשלב הראשון שנכשל. אחריו: לסגור ולפתוח מחדש את האפליקציה בטלפון.
+  > **תקלה אמיתית 2026-10-18:** אחרי פריסה האתר החזיר 502 לכולם — `nginx` רץ שבועות ושמר את הכתובת הפנימית הישנה של `web`, שקיבל כתובת חדשה כשהקונטיינר הוחלף. `docker compose ps` הראה הכול `Up` והסקריפט (שבודק מתוך `web`) דיווח "האתר עונה". לכן הסקריפט מפעיל מחדש את `nginx` בשלב 6; ידנית: `docker compose restart nginx`.
 - **לוגים:** `docker compose logs -f web` / `worker` / `nginx`
 - **מיגרציה ידנית** (הסקריפט כבר מריץ אותה): `docker compose exec web pnpm --filter @barberbook/db run migrate`
   (לא `pnpm db:migrate` — תיקון 2026-09-22: תיקיית העבודה במיכל `web` היא `apps/web`, שאין

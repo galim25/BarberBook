@@ -2,7 +2,7 @@
 # Production deploy (Docker). Run on the prod server from anywhere:
 #   bash /root/barberbook/scripts/deploy.sh
 #
-# Does pull → build → recreate → migrate, and stops on the first check that fails.
+# Does pull → build → recreate → migrate → restart nginx, and stops on the first check that fails.
 # The checks exist because of a real incident (2026-10-06): after `docker compose build`
 # the running `web` container was not replaced, so it kept serving a stale, broken build,
 # and `migrate` run inside it only saw the old migration files, reported "No pending
@@ -58,7 +58,12 @@ found=$(echo "$migrate_out" | grep -oE '[0-9]+ migrations found' | grep -oE '^[0
 [ "$found" = "$repo_migrations" ] || fail "migrate מצא ${found:-?} migrations, בקוד יש $repo_migrations"
 ok "מסד הנתונים מעודכן"
 
-step "6/6 בדיקת תקינות"
+step "6/6 nginx + בדיקת תקינות"
+# nginx resolves the `web` upstream once, at start. After the web container is recreated it gets a new
+# internal IP, and a long-running nginx keeps proxying to the old one -> 502 for everyone (2026-10-18).
+# Restarting it (a few seconds; certificates live in a volume, certbot renews independently) fixes that.
+docker compose restart nginx
+ok "nginx הופעל מחדש"
 for i in $(seq 1 30); do
   status=$(docker compose exec -T web node -e \
     "fetch('http://localhost:3000/login').then(r=>console.log(r.status)).catch(()=>console.log(0))" 2>/dev/null || echo 0)
