@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { subscribeToPushAction, unsubscribeFromPushAction } from "@/lib/actions/push";
-import { isIos, isIosStandalone } from "@/lib/ios";
+import { iosShareHint, isIos, isIosStandalone } from "@/lib/ios";
 import { subscriptionUsesKey, urlBase64ToUint8Array } from "@/lib/pushKey";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -78,12 +78,14 @@ export function PushNotificationToggle({ audience }: { audience: "admin" | "cust
         setStatus("unsupported");
         return;
       }
-      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-        setStatus("unsupported");
-        return;
-      }
+      // Before the support check: iOS exposes PushManager only to an installed home-screen app, so a Safari
+      // tab always looks "unsupported" — which used to hide the toggle (and the install explanation) entirely.
       if (isStandaloneIos()) {
         setStatus("ios-not-installed");
+        return;
+      }
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        setStatus("unsupported");
         return;
       }
       if (Notification.permission === "denied") {
@@ -182,8 +184,8 @@ export function PushNotificationToggle({ audience }: { audience: "admin" | "cust
       <p className="text-ink font-bold">התראות למכשיר זה</p>
       {status === "ios-not-installed" && (
         <p className="text-slate-muted mt-1">
-          באייפון צריך קודם להתקין את האפליקציה למסך הבית (שיתוף ← הוסף למסך הבית) — רק אז אפשר להפעיל
-          התראות.
+          באייפון אפשר לקבל התראות רק מהאפליקציה שמותקנת על מסך הבית. {iosShareHint()} ואז לפתוח את האפליקציה
+          מהאייקון ולהפעיל התראות.
         </p>
       )}
       {status === "denied" && (
