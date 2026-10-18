@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation";
 import { whatsappUrl } from "@/lib/contacts";
 import { setContactNameAction } from "@/lib/actions/contacts";
 
-const actionClass = "border-barber-teal text-barber-teal rounded-full border px-2.5 py-0.5 text-xs font-medium";
+const smallActionClass = "border-barber-teal text-barber-teal rounded-full border px-2.5 py-0.5 text-xs font-medium";
 
 /** Call / SMS / WhatsApp buttons for one number — admin screens only. */
-export function ContactActions({ phone }: { phone: string }) {
+export function ContactActions({ phone, large = false }: { phone: string; large?: boolean }) {
+  const actionClass = large
+    ? "border-barber-teal text-barber-teal inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border px-4 text-sm font-medium"
+    : smallActionClass;
   return (
     <span className="flex flex-wrap items-center gap-1.5">
       <a href={`tel:${phone}`} className={actionClass}>
@@ -36,12 +39,15 @@ export function CustomerContact({
   registeredName,
   contactName,
   prefix,
+  large = false,
   children,
 }: {
   phone: string | null;
   registeredName: string | null;
   contactName: string | null | undefined;
   prefix?: React.ReactNode;
+  /** Touch-sized (44px) action buttons — used by the dashboard day list. */
+  large?: boolean;
   children?: React.ReactNode;
 }) {
   const router = useRouter();
@@ -81,7 +87,7 @@ export function CustomerContact({
               setEditing(true);
             }}
             aria-label="עריכת השם אצלי"
-            className="text-barber-teal shrink-0 text-xs font-normal"
+            className={`text-barber-teal shrink-0 text-xs font-normal${large ? " inline-flex min-h-11 min-w-11 items-center justify-center" : ""}`}
           >
             ✎
           </button>
@@ -119,7 +125,7 @@ export function CustomerContact({
           <span dir="ltr" className="text-slate-muted">
             {phone}
           </span>
-          <ContactActions phone={phone} />
+          <ContactActions phone={phone} large={large} />
         </div>
       )}
     </div>

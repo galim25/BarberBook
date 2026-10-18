@@ -13,7 +13,16 @@ export type AdminMenuItem = { href: string; label: string; count?: number };
  * centered — the panel hangs from the button's right edge via `right-0`
  * instead of the old centered left-1/2/-translate-x-1/2.
  */
-export function AdminMenu({ items, footer }: { items: AdminMenuItem[]; footer?: ReactNode }) {
+export function AdminMenu({
+  items,
+  footer,
+  panelSide = "right",
+}: {
+  items: AdminMenuItem[];
+  footer?: ReactNode;
+  /** Which edge of the button the panel hangs from (use "left" when the button sits at the left of the screen). */
+  panelSide?: "right" | "left";
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -21,7 +30,7 @@ export function AdminMenu({ items, footer }: { items: AdminMenuItem[]; footer?: 
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="border-barber-teal text-barber-teal flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium"
+        className="border-barber-teal text-barber-teal flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium"
       >
         <MenuIcon />
         תפריט
@@ -30,7 +39,7 @@ export function AdminMenu({ items, footer }: { items: AdminMenuItem[]; footer?: 
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="border-barber-teal bg-cream absolute top-full right-0 z-20 mt-2 flex w-64 flex-col gap-1 rounded-xl border p-2 shadow-lg">
+          <div className={`border-barber-teal bg-cream absolute top-full z-20 ${panelSide === "left" ? "left-0" : "right-0"} mt-2 flex w-64 max-w-[calc(100vw-3rem)] flex-col gap-1 rounded-xl border p-2 shadow-lg`}>
             {items.map((item) => (
               <Link
                 key={item.href}

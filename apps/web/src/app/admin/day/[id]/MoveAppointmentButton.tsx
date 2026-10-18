@@ -18,10 +18,12 @@ export function MoveAppointmentButton({
   appointmentId,
   workDayId,
   serviceId,
+  large = false,
 }: {
   appointmentId: string;
   workDayId: string;
   serviceId: string;
+  large?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -54,7 +56,14 @@ export function MoveAppointmentButton({
 
   if (!open) {
     return (
-      <button onClick={start} className="bg-barber-teal text-cream-text rounded-full px-3 py-1 text-xs font-medium">
+      <button
+        onClick={start}
+        className={
+          large
+            ? "border-barber-teal text-barber-teal min-h-11 rounded-full border px-4 text-sm font-medium"
+            : "bg-barber-teal text-cream-text rounded-full px-3 py-1 text-xs font-medium"
+        }
+      >
         העברת התור לשעה אחרת
       </button>
     );
