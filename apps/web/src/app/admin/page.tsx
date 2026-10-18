@@ -173,7 +173,7 @@ export default async function AdminPage({
                 </div>
               </div>
               <p className="text-slate-muted">
-                {formatHour(d.starts_at)}–{formatHour(d.ends_at)}
+                <span dir="ltr">{formatHour(d.starts_at)}–{formatHour(d.ends_at)}</span>
               </p>
               {d.breaks.length > 0 && (
                 <p className="text-slate-muted">

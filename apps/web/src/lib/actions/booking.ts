@@ -291,7 +291,7 @@ export async function rescheduleAppointmentAction(input: RescheduleInput): Promi
     );
     // Moving away from the old time frees that slot, same as a cancellation would.
     if (moved.old_starts_at >= new Date() && moved.old_starts_at.getTime() !== moved.new_starts_at.getTime()) {
-      await notifyWaitlistOfFreedSlot(moved.old_starts_at, moved.service_name, session.sub).catch((err) =>
+      await notifyWaitlistOfFreedSlot(moved.old_starts_at, moved.old_ends_at, session.sub).catch((err) =>
         console.error("[notify] failed to notify waitlist of freed slot:", err),
       );
     }

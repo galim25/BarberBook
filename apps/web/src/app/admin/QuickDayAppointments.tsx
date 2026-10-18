@@ -68,7 +68,7 @@ export function QuickDayAppointments({
               key={i}
               className="border-barber-teal/40 bg-white rounded-xl border border-dashed p-2 text-sm text-slate-muted"
             >
-              {formatHHMM(s.starts_at)}–{formatHHMM(s.ends_at)} ·{" "}
+              <span dir="ltr">{formatHHMM(s.starts_at)}–{formatHHMM(s.ends_at)}</span> ·{" "}
               {s.kind === "break" ? "הפסקה" : "חסום"}
             </li>
           );

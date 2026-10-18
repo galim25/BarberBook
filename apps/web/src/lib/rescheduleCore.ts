@@ -12,6 +12,7 @@ export type CheckedReschedule = {
   customer_name: string;
   booked_by_user_id: string | null;
   old_starts_at: Date;
+  old_ends_at: Date;
   new_starts_at: Date;
   duration_minutes: number;
   pending_booking_request: boolean;
@@ -80,6 +81,7 @@ export async function checkAndMaybeMove(
     customer_name: appointment.customer_name,
     booked_by_user_id: appointment.booked_by_user_id,
     old_starts_at: appointment.starts_at,
+    old_ends_at: appointment.ends_at,
     new_starts_at: target.starts_at,
     duration_minutes: appointment.service.duration_minutes,
     pending_booking_request: appointment.booking_request?.status === "pending",

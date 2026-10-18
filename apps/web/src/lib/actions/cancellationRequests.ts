@@ -71,7 +71,7 @@ export async function requestCancellationAction(appointment_id: string): Promise
         customer_name: session.full_name,
         starts_at: appointment.starts_at,
       });
-      await notifyWaitlistOfFreedSlot(appointment.starts_at, appointment.service.name, appointment.booked_by_user_id);
+      await notifyWaitlistOfFreedSlot(appointment.starts_at, appointment.ends_at, appointment.booked_by_user_id);
     }
     revalidatePath("/account/appointments");
     return { success: true };
@@ -170,7 +170,7 @@ async function decideCancellationRequest(
     if (request.appointment.starts_at >= new Date()) {
       await notifyWaitlistOfFreedSlot(
         request.appointment.starts_at,
-        request.appointment.service.name,
+        request.appointment.ends_at,
         request.appointment.booked_by_user_id,
       );
     }

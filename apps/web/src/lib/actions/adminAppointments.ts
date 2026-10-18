@@ -79,7 +79,7 @@ export async function adminRescheduleAppointmentAction(
   if (!(await requireAdminSession())) return { error: "אין הרשאה" };
 
   type NotifyPayload = { user_id: string; phone_number: string; appointment_id: string; message: string };
-  type FreedSlot = { starts_at: Date; new_starts_at: Date; service_name: string; owner_user_id: string | null };
+  type FreedSlot = { starts_at: Date; ends_at: Date; new_starts_at: Date; owner_user_id: string | null };
 
   try {
     const { notify, freed } = await prisma.$transaction(
@@ -123,8 +123,8 @@ export async function adminRescheduleAppointmentAction(
 
         const freed: FreedSlot = {
           starts_at: appointment.starts_at,
+          ends_at: appointment.ends_at,
           new_starts_at: starts_at,
-          service_name: appointment.service.name,
           owner_user_id: appointment.booked_by_user_id,
         };
         if (!appointment.booked_by) return { notify: null, freed };
@@ -152,7 +152,7 @@ export async function adminRescheduleAppointmentAction(
     }
     // Moving away from the old time frees that slot, same as a cancellation would.
     if (freed.starts_at >= new Date() && freed.starts_at.getTime() !== freed.new_starts_at.getTime()) {
-      await notifyWaitlistOfFreedSlot(freed.starts_at, freed.service_name, freed.owner_user_id).catch((err) =>
+      await notifyWaitlistOfFreedSlot(freed.starts_at, freed.ends_at, freed.owner_user_id).catch((err) =>
         console.error("[notify] failed to notify waitlist of freed slot:", err),
       );
     }
@@ -194,7 +194,7 @@ export async function cancelAppointmentAction(appointment_id: string): Promise<B
   }
 
   if (appointment.starts_at >= new Date()) {
-    await notifyWaitlistOfFreedSlot(appointment.starts_at, appointment.service.name, appointment.booked_by_user_id);
+    await notifyWaitlistOfFreedSlot(appointment.starts_at, appointment.ends_at, appointment.booked_by_user_id);
   }
 
   revalidatePath(`/admin/day/${appointment.work_day_id}`);

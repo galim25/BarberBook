@@ -525,7 +525,7 @@ export default function BookAppointmentPage() {
                 >
                   {p.label}{" "}
                   <span className="text-slate-muted text-sm">
-                    ({formatTime(p.starts_at.toISOString())}–{formatTime(p.ends_at.toISOString())})
+                    (<span dir="ltr">{formatTime(p.starts_at.toISOString())}–{formatTime(p.ends_at.toISOString())}</span>)
                   </span>
                 </button>
               );

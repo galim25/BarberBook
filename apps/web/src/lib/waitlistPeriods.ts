@@ -55,7 +55,8 @@ export function validateWaitlistPeriods(periods: WaitlistPeriodConfig[]): string
 
 /** "09:00-13:00" */
 export function waitlistPeriodRange(p: { from: string; to: string }): string {
-  return `${p.from}-${p.to}`;
+  // LTR isolate: inside Hebrew text the digits would otherwise render reversed ("13:00-09:00").
+  return `\u2066${p.from}-${p.to}\u2069`;
 }
 
 export function waitlistPeriodLabel(periods: WaitlistPeriodConfig[], key: string): string {

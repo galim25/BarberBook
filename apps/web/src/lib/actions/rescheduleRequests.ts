@@ -131,7 +131,7 @@ async function decideRescheduleRequest(
   if (moved && moved.old_starts_at >= new Date() && moved.old_starts_at.getTime() !== moved.new_starts_at.getTime()) {
     await notifyWaitlistOfFreedSlot(
       moved.old_starts_at,
-      moved.service_name,
+      request.appointment.ends_at,
       request.appointment.booked_by_user_id,
     ).catch((err) => console.error("[notify] failed to notify waitlist of freed slot:", err));
   }

@@ -268,10 +268,10 @@ async function notifyAllWaitlistEntries(
  */
 export async function notifyWaitlistOfFreedSlot(
   starts_at: Date,
-  service_name: string,
+  ends_at: Date,
   owner_user_id?: string | null,
 ): Promise<void> {
-  const message = `התפנה תור ל${service_name} בתאריך ${formatIsraelDate(starts_at)} בשעה ${formatIsraelTime(starts_at)} — מיהרו לקבוע!`;
+  const message = `התפנה תור בתאריך ${formatIsraelDate(starts_at)} בשעה \u2066${formatIsraelTime(starts_at)}–${formatIsraelTime(ends_at)}\u2069 — מהרו לקבוע תור!`;
   await notifyAllWaitlistEntries(message, { exclude_user_id: owner_user_id, freedSlotsOnly: true });
 
   // Per-date waitlist: only people who asked about this exact work day and time of day.

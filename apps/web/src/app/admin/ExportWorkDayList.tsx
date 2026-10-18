@@ -21,7 +21,7 @@ export function ExportWorkDayList({ days }: { days: ExportWorkDay[] }) {
       {days.map((d) => (
         <div key={d.id} className="break-inside-avoid">
           <h2 className="mb-2 font-bold">
-            {formatWorkDate(d.work_date)} · {formatHHMM(d.starts_at)}–{formatHHMM(d.ends_at)}
+            {formatWorkDate(d.work_date)} · <span dir="ltr">{formatHHMM(d.starts_at)}–{formatHHMM(d.ends_at)}</span>
           </h2>
           {d.appointments.length === 0 ? (
             <p className="text-sm text-gray-500">אין תורים ביום זה.</p>
@@ -39,7 +39,7 @@ export function ExportWorkDayList({ days }: { days: ExportWorkDay[] }) {
                 {d.appointments.map((a) => (
                   <tr key={a.id} className="border-b border-gray-200">
                     <td className="p-1">
-                      {formatHHMM(a.starts_at)}–{formatHHMM(a.ends_at)}
+                      <span dir="ltr">{formatHHMM(a.starts_at)}–{formatHHMM(a.ends_at)}</span>
                     </td>
                     <td className="p-1">{a.service_name}</td>
                     <td className="p-1">
