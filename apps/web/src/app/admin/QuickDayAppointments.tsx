@@ -7,7 +7,8 @@ import { CancelAppointmentButton } from "./day/[id]/CancelAppointmentButton";
 import { CreateManualAppointmentForm } from "./day/[id]/CreateManualAppointmentForm";
 import { MoveAppointmentButton } from "./day/[id]/MoveAppointmentButton";
 import { CustomerContact } from "@/components/CustomerContact";
-import { PlusIcon } from "@/components/AdminIcons";
+import { PlusIcon, WhatsAppIcon } from "@/components/AdminIcons";
+import { whatsappUrl } from "@/lib/contacts";
 
 function formatHHMM(d: Date) {
   return d.toLocaleTimeString("en-GB", {
@@ -35,12 +36,16 @@ export function QuickDayAppointments({
 }) {
   const [openSlotStartsAt, setOpenSlotStartsAt] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   return (
     <div className="flex flex-col gap-3">
       {withCreateButton &&
         (createOpen ? (
-          <CreateManualAppointmentForm workDayId={workDayId} onCancel={() => setCreateOpen(false)} />
+          <CreateManualAppointmentForm
+            workDayId={workDayId}
+            onCancel={() => setCreateOpen(false)}
+          />
         ) : (
           <button
             onClick={() => setCreateOpen(true)}
@@ -50,11 +55,16 @@ export function QuickDayAppointments({
             קביעת תור ידני
           </button>
         ))}
-      {timeline.length === 0 && <p className="text-slate-muted text-sm">אין תורים להצגה ביום זה.</p>}
+      {timeline.length === 0 && (
+        <p className="text-slate-muted text-sm">אין תורים להצגה ביום זה.</p>
+      )}
       <ul className="flex flex-col gap-2">
         {timeline.map((s, i) => {
           const time = (
-            <span dir="ltr" className="text-barber-teal shrink-0 font-bold tabular-nums">
+            <span
+              dir="ltr"
+              className="text-barber-teal shrink-0 font-bold tabular-nums"
+            >
               {freeAsSlots || s.kind === "appointment"
                 ? formatHHMM(s.starts_at)
                 : `${formatHHMM(s.starts_at)}–${formatHHMM(s.ends_at)}`}
@@ -103,32 +113,76 @@ export function QuickDayAppointments({
               </li>
             );
           }
+          const expanded = expandedId === s.id;
+          const displayName =
+            s.contact_name || s.customer_name || s.phone_number || "";
           return (
-            <li key={s.id} className="border-barber-teal bg-white flex flex-col gap-3 rounded-xl border p-3 text-sm">
-              <div className="flex items-start gap-3">
-                <span className="bg-barber-teal/10 rounded-lg px-2 py-1">{time}</span>
-                <div className="min-w-0 flex-1">
+            <li
+              key={s.id}
+              className="border-barber-teal bg-white flex flex-col gap-3 rounded-xl border px-3 py-2 text-sm"
+            >
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(expanded ? null : s.id)}
+                  aria-expanded={expanded}
+                  className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-start"
+                >
+                  {time}
+                  <span className="text-ink truncate font-bold">
+                    {displayName}
+                  </span>
+                  {s.phone_number && (
+                    <span
+                      dir="ltr"
+                      className="text-slate-muted shrink-0 text-xs"
+                    >
+                      {s.phone_number}
+                    </span>
+                  )}
+                </button>
+                {s.phone_number && (
+                  <a
+                    href={whatsappUrl(s.phone_number)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="וואטסאפ"
+                    className="border-barber-teal text-barber-teal inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border"
+                  >
+                    <WhatsAppIcon size={20} />
+                  </a>
+                )}
+              </div>
+              {expanded && (
+                <div className="border-barber-teal/20 flex flex-col gap-3 border-t pt-3">
                   <CustomerContact
                     large
+                    showActions={false}
                     phone={s.phone_number}
                     registeredName={s.customer_name}
                     contactName={s.contact_name}
                   >
                     <p className="text-slate-muted text-xs break-words">
                       {s.service_name}
-                      {s.attendee_type === "child" && ` (עבור: ${s.attendee_name})`}
+                      {s.attendee_type === "child" &&
+                        ` (עבור: ${s.attendee_name})`}
                       {!s.has_account && " · תור ידני"}
                       {s.booked_via_ivr && " · נקבע בטלפון (IVR)"}
                     </p>
                   </CustomerContact>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {showMoveButton && (
+                      <MoveAppointmentButton
+                        appointmentId={s.id}
+                        workDayId={workDayId}
+                        serviceId={s.service_id}
+                        large
+                      />
+                    )}
+                    <CancelAppointmentButton appointmentId={s.id} large />
+                  </div>
                 </div>
-              </div>
-              <div className="border-barber-teal/20 flex flex-wrap items-center gap-2 border-t pt-3">
-                {showMoveButton && (
-                  <MoveAppointmentButton appointmentId={s.id} workDayId={workDayId} serviceId={s.service_id} large />
-                )}
-                <CancelAppointmentButton appointmentId={s.id} large />
-              </div>
+              )}
             </li>
           );
         })}

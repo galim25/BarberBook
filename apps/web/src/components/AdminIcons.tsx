@@ -1,6 +1,10 @@
 type IconProps = { size?: number; className?: string };
 
-function Svg({ size = 20, className, children }: IconProps & { children: React.ReactNode }) {
+function Svg({
+  size = 20,
+  className,
+  children,
+}: IconProps & { children: React.ReactNode }) {
   return (
     <svg
       width={size}
@@ -66,5 +70,12 @@ export const HourglassIcon = (p: IconProps) => (
     <path d="M6 2h12M6 22h12" />
     <path d="M7 2v4a5 5 0 0 0 2 4l3 2-3 2a5 5 0 0 0-2 4v4" />
     <path d="M17 2v4a5 5 0 0 1-2 4l-3 2 3 2a5 5 0 0 1 2 4v4" />
+  </Svg>
+);
+
+export const WhatsAppIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+    <path d="M9 8.5c0 3.5 3 6.5 6.5 6.5l1-1.5-2-1-1 .8c-1-.4-2-1.4-2.4-2.4l.8-1-1-2z" />
   </Svg>
 );

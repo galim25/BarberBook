@@ -5,10 +5,17 @@ import { useRouter } from "next/navigation";
 import { whatsappUrl } from "@/lib/contacts";
 import { setContactNameAction } from "@/lib/actions/contacts";
 
-const smallActionClass = "border-barber-teal text-barber-teal rounded-full border px-2.5 py-0.5 text-xs font-medium";
+const smallActionClass =
+  "border-barber-teal text-barber-teal rounded-full border px-2.5 py-0.5 text-xs font-medium";
 
 /** Call / SMS / WhatsApp buttons for one number — admin screens only. */
-export function ContactActions({ phone, large = false }: { phone: string; large?: boolean }) {
+export function ContactActions({
+  phone,
+  large = false,
+}: {
+  phone: string;
+  large?: boolean;
+}) {
   const actionClass = large
     ? "border-barber-teal text-barber-teal inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border px-4 text-sm font-medium"
     : smallActionClass;
@@ -20,7 +27,12 @@ export function ContactActions({ phone, large = false }: { phone: string; large?
       <a href={`sms:${phone}`} className={actionClass}>
         SMS
       </a>
-      <a href={whatsappUrl(phone)} target="_blank" rel="noopener noreferrer" className={actionClass}>
+      <a
+        href={whatsappUrl(phone)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={actionClass}
+      >
         וואטסאפ
       </a>
     </span>
@@ -40,6 +52,7 @@ export function CustomerContact({
   contactName,
   prefix,
   large = false,
+  showActions = true,
   children,
 }: {
   phone: string | null;
@@ -48,6 +61,8 @@ export function CustomerContact({
   prefix?: React.ReactNode;
   /** Touch-sized (44px) action buttons — used by the dashboard day list. */
   large?: boolean;
+  /** Hide the call/SMS/WhatsApp buttons (the caller shows its own). */
+  showActions?: boolean;
   children?: React.ReactNode;
 }) {
   const router = useRouter();
@@ -62,7 +77,10 @@ export function CustomerContact({
     if (!phone) return;
     setPending(true);
     setError(undefined);
-    const result = await setContactNameAction({ phone_number: phone, name: draft });
+    const result = await setContactNameAction({
+      phone_number: phone,
+      name: draft,
+    });
     setPending(false);
     if (result.error) {
       setError(result.error);
@@ -94,7 +112,9 @@ export function CustomerContact({
         )}
       </p>
       {contactName && registeredName && contactName !== registeredName && (
-        <p className="text-slate-muted truncate text-xs">נרשם/ה בשם: {registeredName}</p>
+        <p className="text-slate-muted truncate text-xs">
+          נרשם/ה בשם: {registeredName}
+        </p>
       )}
       {children}
       {editing && phone && (
@@ -114,7 +134,11 @@ export function CustomerContact({
           >
             {pending ? "שומר..." : "שמירה"}
           </button>
-          <button type="button" onClick={() => setEditing(false)} className="text-slate-muted text-xs">
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="text-slate-muted text-xs"
+          >
             ביטול
           </button>
           {error && <p className="w-full text-xs text-red-600">{error}</p>}
@@ -125,7 +149,7 @@ export function CustomerContact({
           <span dir="ltr" className="text-slate-muted">
             {phone}
           </span>
-          <ContactActions phone={phone} large={large} />
+          {showActions && <ContactActions phone={phone} large={large} />}
         </div>
       )}
     </div>
