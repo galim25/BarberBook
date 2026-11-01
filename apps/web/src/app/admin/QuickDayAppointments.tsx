@@ -119,23 +119,28 @@ export function QuickDayAppointments({
           return (
             <li
               key={s.id}
-              className="border-barber-teal bg-white flex flex-col gap-3 rounded-xl border px-3 py-2 text-sm"
+              className="border-barber-teal bg-barber-teal/10 border-s-4 flex min-w-0 flex-col gap-3 rounded-xl border px-3 py-2 text-sm"
             >
-              <div className="flex items-center gap-2">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setExpandedId(expanded ? null : s.id)}
                   aria-expanded={expanded}
-                  className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-start"
+                  className="flex min-h-11 min-w-0 flex-1 items-center gap-2 overflow-hidden text-start"
                 >
-                  {time}
+                  <span
+                    dir="ltr"
+                    className="bg-barber-teal text-cream-text shrink-0 rounded-lg px-2 py-1 font-bold tabular-nums"
+                  >
+                    {formatHHMM(s.starts_at)}
+                  </span>
                   <span className="text-ink truncate font-bold">
                     {displayName}
                   </span>
                   {s.phone_number && (
                     <span
                       dir="ltr"
-                      className="text-slate-muted shrink-0 text-xs"
+                      className="text-slate-muted min-w-0 truncate text-xs"
                     >
                       {s.phone_number}
                     </span>
@@ -147,7 +152,7 @@ export function QuickDayAppointments({
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="וואטסאפ"
-                    className="border-barber-teal text-barber-teal inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border"
+                    className="border-barber-teal text-barber-teal inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border bg-white"
                   >
                     <WhatsAppIcon size={20} />
                   </a>
